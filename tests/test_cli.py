@@ -67,7 +67,7 @@ def test_cli_add_concept_and_bundle():
         res_c = run_cli(
             "add-concept",
             "--title", "Eigenvalues",
-            "--mental-model", "Scaling factors along invariant directional eigenvectors Av = lambda v.",
+            "--content", "# Eigenvalues\n\nScaling factors along invariant directional eigenvectors Av = lambda v.",
             "--topic", "Linear Algebra",
             graph_path=graph_file,
         )
@@ -80,13 +80,13 @@ def test_cli_add_concept_and_bundle():
             "concept": {
                 "title": "Principal Component Analysis",
                 "topic": "Machine Learning",
-                "mental_model": "Orthogonal projection onto directions of maximum variance.",
+                "content": "# Principal Component Analysis\n\nOrthogonal projection onto directions of maximum variance.",
             },
             "prerequisites": [
                 {
                     "title": "Covariance Matrix",
                     "topic": "Linear Algebra",
-                    "mental_model": "Matrix capturing pairwise variances and covariances.",
+                    "content": "# Covariance Matrix\n\nMatrix capturing pairwise variances and covariances.",
                 }
             ],
         })

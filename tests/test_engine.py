@@ -17,9 +17,7 @@ def test_add_concept_and_lookup():
         id="linear-regression",
         title="Linear Regression",
         topic="Statistics",
-        mental_model="Fitting hyperplanes via ordinary least squares minimizing sum of squared residuals.",
-        anchor_example="Normal equation (X^T X)^{-1} X^T y",
-        pitfalls="Assuming correlation equals causation or ignoring multicollinearity.",
+        content="# Linear Regression\n\nOrdinary least squares regression.",
         intrinsic_score=0.9,
     )
     engine.add_concept(bp)
@@ -35,12 +33,12 @@ def test_connect_upward_and_directions():
     c1 = ConceptBlueprint(
         id="matrix-multiplication",
         title="Matrix Multiplication",
-        mental_model="Linear transformation composition.",
+        content="# Matrix Multiplication\n\nLinear transformation composition.",
     )
     c2 = ConceptBlueprint(
         id="neural-network-layer",
         title="Neural Network Layer",
-        mental_model="Affine map Wx + b followed by non-linear activation.",
+        content="# Neural Network Layer\n\nAffine map followed by non-linear activation.",
     )
     engine.add_concept(c1)
     engine.add_concept(c2)
@@ -91,18 +89,18 @@ def test_add_bundle():
         id="variational-autoencoders",
         title="Variational Autoencoders",
         topic="Generative Models",
-        mental_model="Encoder outputs distribution parameters of q(z|x), optimizing the ELBO.",
+        content="# Variational Autoencoders\n\nELBO optimization.",
     )
     prereqs = [
         ConceptBlueprint(
             id="bayes-theorem",
             title="Bayes' Theorem",
-            mental_model="Inversion of conditional probabilities.",
+            content="# Bayes Theorem\n\nPosterior inference.",
         ),
         ConceptBlueprint(
             id="kl-divergence",
             title="KL Divergence",
-            mental_model="Relative entropy between approximate posterior and prior.",
+            content="# KL Divergence\n\nRelative entropy.",
         ),
     ]
 
@@ -127,7 +125,7 @@ def test_stability_formula_diminishing_returns():
     leaf = ConceptBlueprint(
         id="frontier-concept",
         title="Frontier Concept",
-        mental_model="High-level idea with no higher applications yet.",
+        content="# Frontier Concept\n\nTop of knowledge horizon.",
         intrinsic_score=0.85,
     )
     engine.add_concept(leaf)
@@ -141,13 +139,13 @@ def test_stability_formula_diminishing_returns():
     prereq = ConceptBlueprint(
         id="svd",
         title="Singular Value Decomposition",
-        mental_model="Factorization of real matrix into U Sigma V^T.",
+        content="# SVD\n\nMatrix factorization.",
     )
     engine.add_concept(prereq)
 
     # Connect to 3 targets with strengths 1.0, 0.8, 0.9 (avg = 0.9)
     for i, s in enumerate([1.0, 0.8, 0.9]):
-        tgt = ConceptBlueprint(id=f"app-{i}", title=f"App {i}", mental_model="...")
+        tgt = ConceptBlueprint(id=f"app-{i}", title=f"App {i}", content="# App")
         engine.add_concept(tgt)
         engine.connect("svd", f"app-{i}", strength=s)
 
@@ -164,17 +162,17 @@ def test_get_study_candidates_scans_upward_and_prioritizes_frayed():
     vae = ConceptBlueprint(
         id="vae",
         title="VAE",
-        mental_model="Variational autoencoder framework.",
+        content="# VAE\n\nVariational autoencoders.",
     )
     bayes = ConceptBlueprint(
         id="bayes",
         title="Bayes Theorem",
-        mental_model="Belief updating under evidence.",
+        content="# Bayes\n\nBayesian inference.",
     )
     kl = ConceptBlueprint(
         id="kl",
         title="KL Divergence",
-        mental_model="Relative entropy.",
+        content="# KL\n\nInformation divergence.",
     )
     engine.add_concept(vae)
     engine.add_concept(bayes)
@@ -197,8 +195,8 @@ def test_get_study_candidates_scans_upward_and_prioritizes_frayed():
 
 def test_review_joint_and_bundle():
     engine = NexusEngine()
-    c1 = ConceptBlueprint(id="c1", title="C1", mental_model="M1")
-    c2 = ConceptBlueprint(id="c2", title="C2", mental_model="M2")
+    c1 = ConceptBlueprint(id="c1", title="C1", content="# C1")
+    c2 = ConceptBlueprint(id="c2", title="C2", content="# C2")
     engine.add_concept(c1)
     engine.add_concept(c2)
     engine.connect("c1", "c2", strength=0.5)
@@ -210,7 +208,7 @@ def test_review_joint_and_bundle():
     assert updated_conn.last_reviewed is not None
 
     # Review bundle
-    c3 = ConceptBlueprint(id="c3", title="C3", mental_model="M3")
+    c3 = ConceptBlueprint(id="c3", title="C3", content="# C3")
     engine.add_concept(c3)
     engine.connect("c3", "c2", strength=0.4)
 

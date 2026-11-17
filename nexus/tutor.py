@@ -19,23 +19,19 @@ class SocraticTutor:
         lines.append(f"# Socratic Study Target: {candidate.concept.title}")
         lines.append(f"**Domain**: {candidate.concept.topic} | **Urgency**: {candidate.urgency_score:.2f} | **Stability**: {candidate.stability_score:.2f}\n")
 
-        lines.append("## Concept Blueprint")
-        lines.append(f"- **Mechanism**: {candidate.concept.mental_model}")
-        if candidate.concept.anchor_example:
-            lines.append(f"- **Anchor Example**: {candidate.concept.anchor_example}")
-        if candidate.concept.pitfalls:
-            lines.append(f"- **Pitfalls / Anti-patterns**: {candidate.concept.pitfalls}")
+        lines.append("## Concept Document")
+        lines.append(candidate.concept.content)
 
         if candidate.frayed_target and candidate.frayed_connection:
             lines.append("\n## Weak Upward Connection")
             lines.append(f"- **Target Application**: {candidate.frayed_target.title}")
             lines.append(f"- **Connection Strength**: {candidate.frayed_connection.strength:.2f} / 1.00")
-            lines.append(f"- **Target Mechanism**: {candidate.frayed_target.mental_model}")
+            lines.append(f"- **Target Document Excerpt**: {candidate.frayed_target.content[:300]}...")
 
         if candidate.foundational_ingredients:
             lines.append("\n## Foundational Ingredients")
             for ing in candidate.foundational_ingredients:
-                lines.append(f"- **{ing.title}** ({ing.topic}): {ing.mental_model}")
+                lines.append(f"- **{ing.title}** ({ing.topic})")
 
         lines.append("\n## Invariant Rules")
         lines.append("- STRICTLY NO analogies or metaphors (no rubber sheets, rivers, bowling balls, etc.).")

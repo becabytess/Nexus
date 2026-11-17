@@ -10,15 +10,13 @@ def test_socratic_study_brief_and_probe():
         id="vae",
         title="Variational Autoencoder",
         topic="Deep Learning",
-        mental_model="ELBO optimization with reparameterization trick.",
+        content="# Variational Autoencoders\n\nELBO optimization with reparameterization trick.",
     )
     bayes = ConceptBlueprint(
         id="bayes",
         title="Bayes' Theorem",
         topic="Probability",
-        mental_model="Posterior proportional to likelihood times prior.",
-        anchor_example="Medical screening sensitivity and specificity.",
-        pitfalls="Ignoring the base rate in the denominator.",
+        content="# Bayes' Theorem\n\nPosterior proportional to likelihood times prior.",
     )
     engine.add_concept(vae)
     engine.add_concept(bayes)

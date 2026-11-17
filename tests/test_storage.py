@@ -15,16 +15,14 @@ def test_save_and_load_roundtrip():
             id="information-entropy",
             title="Information Entropy",
             topic="Information Theory",
-            mental_model="Expected surprise of a probability distribution: H(X) = -sum p(x) log p(x).",
-            anchor_example="Fair coin toss yields 1 bit of entropy.",
-            pitfalls="Confusing thermodynamic entropy with information entropy.",
+            content="# Information Entropy\n\nExpected surprise of a probability distribution: $H(X) = -\\sum p(x) \\log p(x)$.",
             intrinsic_score=1.0,
         )
         bp2 = ConceptBlueprint(
             id="cross-entropy-loss",
             title="Cross Entropy Loss",
             topic="Machine Learning",
-            mental_model="Measures difference between true distribution and predicted probabilities.",
+            content="# Cross Entropy Loss\n\nMeasures divergence between true and predicted distributions.",
         )
         engine.add_concept(bp1)
         engine.add_concept(bp2)
@@ -36,7 +34,7 @@ def test_save_and_load_roundtrip():
         loaded = load_graph(file_path)
         assert len(loaded.concepts) == 2
         assert "information-entropy" in loaded.concepts
-        assert loaded.concepts["information-entropy"].anchor_example == "Fair coin toss yields 1 bit of entropy."
+        assert "Expected surprise" in loaded.concepts["information-entropy"].content
         assert len(loaded.connections) == 1
         assert loaded.connections[0].strength == 0.88
 

@@ -115,12 +115,8 @@ class NexusEngine:
             p.id = pid
             if pid in self.concepts:
                 existing = self.concepts[pid]
-                if p.mental_model and len(p.mental_model) > len(existing.mental_model):
-                    existing.mental_model = p.mental_model
-                if p.anchor_example and not existing.anchor_example:
-                    existing.anchor_example = p.anchor_example
-                if p.pitfalls and not existing.pitfalls:
-                    existing.pitfalls = p.pitfalls
+                if p.content and len(p.content) > len(existing.content):
+                    existing.content = p.content
                 bp = self.add_concept(existing)
             else:
                 bp = self.add_concept(p)

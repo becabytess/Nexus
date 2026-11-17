@@ -11,32 +11,14 @@ def _now_iso() -> str:
 
 
 class ConceptBlueprint(BaseModel):
-    """A rich personal blueprint of a concept's mental model."""
+    """A concept node containing a complete, standalone Markdown explainer document."""
 
     id: str = Field(..., description="Unique normalized concept slug, e.g. 'bayes-theorem'")
     title: str = Field(..., description="Concept title")
     topic: str = Field(default="General", description="Knowledge domain or category")
-    mental_model: str = Field(
+    content: str = Field(
         ...,
-        description=(
-            "Exhaustive, multi-paragraph explanation of the core mechanism that clicked for the student. "
-            "Must detail the exact mathematical mechanics, structural invariants, and chain of reasoning. "
-            "STRICTLY NEVER a one-liner, dictionary definition, or high-level summary."
-        ),
-    )
-    anchor_example: str = Field(
-        default="",
-        description=(
-            "Detailed concrete scenario, explicit derivation steps, or numerical walk-through "
-            "that demonstrates the mechanism operating under real conditions."
-        ),
-    )
-    pitfalls: str = Field(
-        default="",
-        description=(
-            "Explicit breakdown of overcome misconceptions, subtle edge-case failure modes, "
-            "boundary conditions, or false mental models that were corrected during dialogue."
-        ),
+        description="The complete Markdown explainer document: a readable, standalone study guide with derivations, LaTeX equations, and structural explanations.",
     )
     intrinsic_score: float = Field(
         default=1.0,
