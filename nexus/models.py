@@ -18,15 +18,25 @@ class ConceptBlueprint(BaseModel):
     topic: str = Field(default="General", description="Knowledge domain or category")
     mental_model: str = Field(
         ...,
-        description="Comprehensive explanation of the core mechanism that clicked for the student",
+        description=(
+            "Exhaustive, multi-paragraph explanation of the core mechanism that clicked for the student. "
+            "Must detail the exact mathematical mechanics, structural invariants, and chain of reasoning. "
+            "STRICTLY NEVER a one-liner, dictionary definition, or high-level summary."
+        ),
     )
     anchor_example: str = Field(
         default="",
-        description="Specific intuitive example, derivation step, or concrete scenario that unlocked it",
+        description=(
+            "Detailed concrete scenario, explicit derivation steps, or numerical walk-through "
+            "that demonstrates the mechanism operating under real conditions."
+        ),
     )
     pitfalls: str = Field(
         default="",
-        description="Resolved misconceptions, confusions overcome, or what this concept is NOT",
+        description=(
+            "Explicit breakdown of overcome misconceptions, subtle edge-case failure modes, "
+            "boundary conditions, or false mental models that were corrected during dialogue."
+        ),
     )
     intrinsic_score: float = Field(
         default=1.0,

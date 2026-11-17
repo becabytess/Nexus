@@ -12,6 +12,7 @@ Traditional spaced repetition systems (Anki, SM-2, FSRS) treat knowledge as disc
 
 **Nexus replaces flat cards and scalar masses with a directed cognitive dependency graph:**
 - Concepts are stored as **rich personal blueprints** (the student's verified mental model, anchor examples, and overcome pitfalls—not generic textbook definitions). **All concepts share the exact same schema; no concept is intrinsically special or different.**
+- **Multi-Paragraph Depth (Strictly NO One-Liners)**: Brevity is treated as a defect in Nexus. Every `mental_model` must be an exhaustive, multi-paragraph exposition (typically 2-4 comprehensive paragraphs) detailing the first-principles derivation, structural invariants, and mathematical mechanics that produced the student's personal understanding.
 - Directed edges strictly point **UPWARD** from prerequisites into the higher-level applications that depend on them:
   $$[\text{Prerequisite}] \xrightarrow{\quad\text{strength } w \in [0.0, 1.0]\quad} [\text{Higher Application}]$$
 - **The connection strength $w$ alone creates the hierarchy.** The LLM understands how concepts relate directly from the blueprints.
@@ -108,19 +109,23 @@ python -m nexus.cli review --source bayes-theorem --target variational-autoencod
 ```
 
 ### 3.6 Spontaneous Bundle Crystallization
-Record an "aha!" moment by adding a concept and its supporting prerequisites in one call. Both main concept and prerequisites share the identical blueprint schema:
+Record an "aha!" moment by adding a concept and its supporting prerequisites in one call. **Every concept blueprint must be a serious, multi-paragraph technical breakdown (strictly NO one-liners or brief glosses)**:
 ```bash
 python -m nexus.cli add-bundle --data '{
   "concept": {
-    "title": "Diffusion Models",
+    "title": "Diffusion Probabilistic Models",
     "topic": "Generative Models",
-    "mental_model": "Inverting a forward Gaussian noise process via learned score matching."
+    "mental_model": "A generative framework based on a parameterized Markov chain that reverses a gradual noise-injection process. In the forward process q(x_t | x_{t-1}), Gaussian perturbation is iteratively added over T discrete steps according to a variance schedule beta_t, eventually degrading any data distribution p(x_0) into pure isotropic Gaussian noise N(0, I). By reparameterization, any intermediate state x_t can be sampled directly in closed form from x_0 via alpha_bar_t: x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon.\n\nThe generative model p_theta(x_{t-1} | x_t) learns to reverse this degradation step-by-step. Instead of directly predicting the clean image x_0, the neural network (typically a U-Net conditioned on time step t) is trained with a simplified L2 objective to predict the exact noise vector epsilon added at step t: L_simple = E_{t, x_0, epsilon} [ || epsilon - epsilon_theta(x_t, t) ||^2 ]. This parameterization is mathematically equivalent to score-matching on smoothed densities: the predicted noise directly yields the score function nabla_{x_t} log p(x_t).\n\nSampling proceeds backward from x_T ~ N(0, I) down to x_0 by iteratively subtracting the network predicted noise and adding scaled Gaussian perturbations (for t > 1). This steady thermodynamic reversal prevents mode collapse common in GANs and avoids the blurry interpolations typical of under-regularized autoencoders.",
+    "anchor_example": "Walking through the closed-form forward marginal: showing that as t approaches T, alpha_bar_t approaches 0, reducing the conditional distribution q(x_T | x_0) strictly to N(0, I), completely destroying input signal. In the reverse step, verifying that setting variance sigma_t^2 = 0 turns the stochastic DDPM into a deterministic DDIM ordinary differential equation (ODE) trajectory.",
+    "pitfalls": "Confusing DDPM noise prediction with autoencoder denoising. Standard denoising autoencoders map directly to clean data x_0 in a single step, which averages multimodal possibilities into a blurry mean. Diffusion succeeds because it predicts infinitesimal noise increments over an extended trajectory, resolving ambiguities incrementally across distinct frequency scales."
   },
   "prerequisites": [
     {
-      "title": "Langevin Dynamics",
-      "topic": "Physics/Statistics",
-      "mental_model": "Sampling from unnormalized densities using gradient of log-density."
+      "title": "Langevin Dynamics & Score Matching",
+      "topic": "Statistical Physics & ML",
+      "mental_model": "A Markov Chain Monte Carlo (MCMC) method that generates samples from an unnormalized probability density p(x) using only the gradient of its log-density—termed the score function nabla_x log p(x). The iterative update x_{k+1} = x_k + (epsilon / 2) * nabla_x log p(x_k) + sqrt(epsilon) * z where z ~ N(0, I) combines gradient ascent toward high-density modes with Brownian noise exploration.\n\nThe critical advantage is that the intractable normalizing partition function Z in p(x) = p_tilde(x) / Z vanishes upon taking the spatial gradient: nabla_x log p(x) = nabla_x log p_tilde(x) - nabla_x log Z = nabla_x log p_tilde(x). Score matching trains a model s_theta(x) to approximate this gradient field without ever computing or approximating Z.\n\nIn low-density data regions, score estimation is fundamentally inaccurate because samples rarely appear there during training. Diffusion models resolve this fatal limitation of Langevin dynamics by perturbing the data at multiple noise scales, ensuring non-zero density everywhere and providing a gradient highway connecting noise to data modes.",
+      "anchor_example": "Writing out the update for a 2D Gaussian mixture model: demonstrating that without the noise term sqrt(epsilon) * z, the update is pure gradient ascent collapsing to local modes. With the Langevin noise term, the trajectory correctly samples according to the relative mass of each Gaussian component.",
+      "pitfalls": "Believing that Langevin dynamics requires knowing the partition function Z. Its entire purpose and power lie in operating strictly on score vectors, rendering normalizing constants completely irrelevant."
     }
   ]
 }'
