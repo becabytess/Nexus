@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from nexus.models import (
@@ -23,16 +24,40 @@ def slugify(text: str) -> str:
 class NexusEngine:
     """Directed Cognitive Blueprint & Connection-Strength Knowledge Engine.
 
-    Pointers strictly point UPWARD from foundational ingredients to higher-level applications:
-        [Prerequisite] ──(connection_strength)──► [Higher Application]
+    Maintains bidirectional adjacency pointers for instant O(1) traversal in both directions:
+        - UPWARD (_adj_up): [Prerequisite] ──(w)──► [Higher Application] (where concept is applied)
+        - DOWNWARD (_adj_down): [Higher Application] ◄──(w)── [Prerequisite] (what concept is composed of)
 
     Selection scans UPWARD: concepts with weak outgoing connections into higher applications
-    are prioritized for study, packaged together with their foundational ingredients.
+    are prioritized for study, packaged together with their foundational ingredients retrieved
+    via instant DOWNWARD pointers.
     """
 
     def __init__(self) -> None:
         self.concepts: Dict[str, ConceptBlueprint] = {}
         self.connections: List[Connection] = []
+        # Bidirectional adjacency indices for O(1) navigation
+        self._adj_up: Dict[str, List[Connection]] = defaultdict(list)    # source_id -> outgoing connections
+        self._adj_down: Dict[str, List[Connection]] = defaultdict(list)  # target_id -> incoming connections
+
+    def _index_connection(self, conn: Connection) -> None:
+        """Register a connection in both the upward and downward adjacency indices."""
+        # Update or append in _adj_up
+        up_list = self._adj_up[conn.source_id]
+        if conn not in up_list:
+            up_list.append(conn)
+
+        # Update or append in _adj_down
+        down_list = self._adj_down[conn.target_id]
+        if conn not in down_list:
+            down_list.append(conn)
+
+    def reindex(self) -> None:
+        """Rebuild bidirectional adjacency indices from the connection pool."""
+        self._adj_up.clear()
+        self._adj_down.clear()
+        for conn in self.connections:
+            self._index_connection(conn)
 
     # -------------------------------------------------------------------------
     # Graph Construction & Modification
@@ -51,16 +76,22 @@ class NexusEngine:
         strength: float = 1.0,
         context_role: str = "",
     ) -> Connection:
-        """Create or update a directed upward connection from prerequisite to higher concept."""
+        """Create or update a directed connection between prerequisite and higher concept.
+
+        Maintains instant pointers in both directions:
+        - source_id registers an UPWARD pointer to target_id.
+        - target_id registers a DOWNWARD pointer to source_id.
+        """
         if source_id not in self.concepts:
             raise KeyError(f"Source concept {source_id!r} not found in graph")
         if target_id not in self.concepts:
             raise KeyError(f"Target concept {target_id!r} not found in graph")
 
         clamped = max(0.0, min(1.0, float(strength)))
-        # Check if connection already exists
-        for conn in self.connections:
-            if conn.source_id == source_id and conn.target_id == target_id:
+
+        # Check if connection already exists in upward index
+        for conn in self._adj_up.get(source_id, []):
+            if conn.target_id == target_id:
                 conn.strength = clamped
                 if context_role:
                     conn.context_role = context_role
@@ -73,6 +104,7 @@ class NexusEngine:
             context_role=context_role,
         )
         self.connections.append(conn)
+        self._index_connection(conn)
         return conn
 
     def add_bundle(
@@ -133,19 +165,27 @@ class NexusEngine:
         }
 
     # -------------------------------------------------------------------------
-    # Graph Inspection & Neighborhoods
+    # Graph Inspection & Neighborhoods (O(1) Bidirectional Traversal)
     # -------------------------------------------------------------------------
 
     def get_outgoing(self, concept_id: str) -> List[Connection]:
-        """Look UP: return all connections where this concept is used as an ingredient."""
-        return [c for c in self.connections if c.source_id == concept_id]
+        """Look UP: instant O(1) return of all upward connections where concept is used as an ingredient."""
+        return list(self._adj_up.get(concept_id, []))
 
     def get_incoming(self, concept_id: str) -> List[Connection]:
-        """Look DOWN: return all connections feeding into this concept as ingredients."""
-        return [c for c in self.connections if c.target_id == concept_id]
+        """Look DOWN: instant O(1) return of all downward connections pointing into this concept's ingredients."""
+        return list(self._adj_down.get(concept_id, []))
+
+    def get_components(self, concept_id: str) -> List[Connection]:
+        """Look DOWN: explicit top-down query retrieving all component ingredients of a parent concept."""
+        return self.get_incoming(concept_id)
+
+    def get_applications(self, concept_id: str) -> List[Connection]:
+        """Look UP: explicit bottom-up query retrieving all higher-level applications of a prerequisite."""
+        return self.get_outgoing(concept_id)
 
     def get_foundational_ingredients(self, concept_id: str) -> List[ConceptBlueprint]:
-        """Retrieve all blueprints directly pointing into this concept from below."""
+        """Retrieve all component blueprints directly needed to construct this concept from below."""
         inbound = self.get_incoming(concept_id)
         return [self.concepts[c.source_id] for c in inbound if c.source_id in self.concepts]
 

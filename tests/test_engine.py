@@ -66,15 +66,24 @@ def test_connect_upward_and_directions():
     assert len(incoming) == 1
     assert incoming[0].source_id == "matrix-multiplication"
 
-    # Inbound ingredients
+    # Inbound ingredients (direct top-down pointers)
     ingredients = engine.get_foundational_ingredients("neural-network-layer")
     assert len(ingredients) == 1
     assert ingredients[0].id == "matrix-multiplication"
 
-    # Higher applications
+    # Explicit top-down component retrieval
+    components = engine.get_components("neural-network-layer")
+    assert len(components) == 1
+    assert components[0].source_id == "matrix-multiplication"
+
+    # Higher applications (bottom-up pointers)
     higher = engine.get_higher_applications("matrix-multiplication")
     assert len(higher) == 1
     assert higher[0].id == "neural-network-layer"
+
+    applications = engine.get_applications("matrix-multiplication")
+    assert len(applications) == 1
+    assert applications[0].target_id == "neural-network-layer"
 
 
 def test_add_bundle():

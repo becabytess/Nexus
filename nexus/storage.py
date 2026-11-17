@@ -45,4 +45,5 @@ def load_graph(path: str = DEFAULT_GRAPH_FILE) -> NexusEngine:
     for conn_dict in connections_data:
         engine.connections.append(Connection(**conn_dict))
 
+    engine.reindex()
     return engine
