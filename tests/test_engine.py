@@ -2,7 +2,7 @@
 import math
 import pytest
 from nexus.engine import NexusEngine, slugify
-from nexus.models import CheckpointSpec, ConceptBlueprint, Connection
+from nexus.models import ConceptBlueprint, Connection
 
 
 def test_slugify():
@@ -50,7 +50,6 @@ def test_connect_upward_and_directions():
         source_id="matrix-multiplication",
         target_id="neural-network-layer",
         strength=0.95,
-        context_role="Computes the linear combination of inputs across weight columns.",
     )
 
     assert conn.strength == 0.95
@@ -94,20 +93,20 @@ def test_add_bundle():
         topic="Generative Models",
         mental_model="Encoder outputs distribution parameters of q(z|x), optimizing the ELBO.",
     )
-    checkpoints = [
-        CheckpointSpec(
+    prereqs = [
+        ConceptBlueprint(
+            id="bayes-theorem",
             title="Bayes' Theorem",
             mental_model="Inversion of conditional probabilities.",
-            context_role="Formulates the true posterior p(z|x).",
         ),
-        CheckpointSpec(
+        ConceptBlueprint(
+            id="kl-divergence",
             title="KL Divergence",
             mental_model="Relative entropy between approximate posterior and prior.",
-            context_role="Regularization term in ELBO.",
         ),
     ]
 
-    res = engine.add_bundle(target, checkpoints)
+    res = engine.add_bundle(target, prereqs)
 
     assert len(engine.concepts) == 3
     assert "variational-autoencoders" in engine.concepts
@@ -182,8 +181,8 @@ def test_get_study_candidates_scans_upward_and_prioritizes_frayed():
     engine.add_concept(kl)
 
     # Wire upward: bayes -> vae, kl -> vae
-    engine.connect("bayes", "vae", strength=0.35, context_role="Intractable posterior formulation")
-    engine.connect("kl", "vae", strength=0.98, context_role="Regularizer")
+    engine.connect("bayes", "vae", strength=0.35)
+    engine.connect("kl", "vae", strength=0.98)
 
     candidates = engine.get_study_candidates(top_k=2)
 
@@ -194,7 +193,6 @@ def test_get_study_candidates_scans_upward_and_prioritizes_frayed():
     assert top.frayed_target is not None
     assert top.frayed_target.id == "vae"
     assert top.frayed_connection.strength == 0.35
-    assert "Frayed connection (0.35)" in top.reason
 
 
 def test_review_joint_and_bundle():

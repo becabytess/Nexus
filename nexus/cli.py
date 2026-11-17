@@ -7,7 +7,7 @@ import os
 import sys
 
 from nexus.engine import NexusEngine, slugify
-from nexus.models import CheckpointSpec, ConceptBlueprint
+from nexus.models import ConceptBlueprint
 from nexus.storage import DEFAULT_GRAPH_FILE, load_graph, save_graph
 
 
@@ -24,7 +24,7 @@ def cmd_init(args) -> None:
 
     engine = NexusEngine()
 
-    # Pre-seed: Variational Autoencoders with rich blueprints
+    # Pre-seed concepts: all are identical ConceptBlueprints
     vae = ConceptBlueprint(
         id="variational-autoencoders",
         title="Variational Autoencoders (VAEs)",
@@ -50,47 +50,51 @@ def cmd_init(args) -> None:
         intrinsic_score=1.0,
     )
 
-    checkpoints = [
-        CheckpointSpec(
-            title="Bayes' Theorem",
-            topic="Probability",
-            mental_model=(
-                "Belief re-weighting under evidence: P(Hypothesis | Data) = [P(Data | Hypothesis) * P(Hypothesis)] / P(Data). "
-                "The posterior is the prior distribution re-weighted by how well each hypothesis explains the observed data. "
-                "The denominator P(Data) = integral P(Data|z)P(z)dz is the marginal evidence, which becomes intractable in high dimensions."
-            ),
-            anchor_example="Medical testing: high false-positive rates when the prior prevalence is low.",
-            pitfalls="Confusing likelihood P(Data|Hypothesis) with posterior probability P(Hypothesis|Data).",
-            context_role="Formulates the true intractable posterior p(z|x) = p(x|z)p(z)/p(x) that VAE approximates with q(z|x).",
+    bayes = ConceptBlueprint(
+        id="bayes-theorem",
+        title="Bayes' Theorem",
+        topic="Probability",
+        mental_model=(
+            "Belief re-weighting under evidence: P(Hypothesis | Data) = [P(Data | Hypothesis) * P(Hypothesis)] / P(Data). "
+            "The posterior is the prior distribution re-weighted by how well each hypothesis explains the observed data. "
+            "The denominator P(Data) = integral P(Data|z)P(z)dz is the marginal evidence, which becomes intractable in high dimensions."
         ),
-        CheckpointSpec(
-            title="KL Divergence",
-            topic="Information Theory",
-            mental_model=(
-                "A directed, asymmetric measure of statistical distance from distribution Q to reference distribution P: "
-                "D_KL(Q || P) = sum Q(x) log(Q(x) / P(x)). It measures the expected excess code length or surprise when "
-                "coding events using an approximate model Q instead of true P. It is strictly >= 0 via Jensen's inequality."
-            ),
-            anchor_example="For two univariate Gaussians N(mu, sigma^2) and N(0, 1), KL divergence has an exact closed form: 0.5 * (mu^2 + sigma^2 - 1 - log(sigma^2)).",
-            pitfalls="Assuming KL divergence is a metric. It violates symmetry (D_KL(P||Q) != D_KL(Q||P)) and the triangle inequality.",
-            context_role="Acts as the regularizer in the ELBO loss, penalizing encoder distributions that drift away from prior N(0, I).",
-        ),
-        CheckpointSpec(
-            title="Latent Space Bottleneck",
-            topic="Representation Learning",
-            mental_model=(
-                "An informational constriction that forces a model to discover low-dimensional coordinate systems "
-                "capturing independent generative factors rather than copying raw sensory input."
-            ),
-            anchor_example="Compressing 784-pixel MNIST digits into a 2D coordinate space (angle and thickness).",
-            pitfalls="Assuming smaller latent dimensions are always better; too small causes underfitting/information loss.",
-            context_role="Provides the low-dimensional manifold z on which the generative process operates.",
-        ),
-    ]
+        anchor_example="Medical testing: high false-positive rates when the prior prevalence is low.",
+        pitfalls="Confusing likelihood P(Data|Hypothesis) with posterior probability P(Hypothesis|Data).",
+        intrinsic_score=1.0,
+    )
 
-    engine.add_bundle(vae, checkpoints)
+    kl = ConceptBlueprint(
+        id="kl-divergence",
+        title="KL Divergence",
+        topic="Information Theory",
+        mental_model=(
+            "A directed, asymmetric measure of statistical distance from distribution Q to reference distribution P: "
+            "D_KL(Q || P) = sum Q(x) log(Q(x) / P(x)). It measures the expected excess code length or surprise when "
+            "coding events using an approximate model Q instead of true P. It is strictly >= 0 via Jensen's inequality."
+        ),
+        anchor_example="For two univariate Gaussians N(mu, sigma^2) and N(0, 1), KL divergence has an exact closed form: 0.5 * (mu^2 + sigma^2 - 1 - log(sigma^2)).",
+        pitfalls="Assuming KL divergence is a metric. It violates symmetry (D_KL(P||Q) != D_KL(Q||P)) and the triangle inequality.",
+        intrinsic_score=1.0,
+    )
 
-    # Add a higher-level concept: Bayesian Neural Networks (BNNs) building on VAE
+    bottleneck = ConceptBlueprint(
+        id="latent-space-bottleneck",
+        title="Latent Space Bottleneck",
+        topic="Representation Learning",
+        mental_model=(
+            "An informational constriction that forces a model to discover low-dimensional coordinate systems "
+            "capturing independent generative factors rather than copying raw sensory input."
+        ),
+        anchor_example="Compressing 784-pixel MNIST digits into a 2D coordinate space (angle and thickness).",
+        pitfalls="Assuming smaller latent dimensions are always better; too small causes underfitting/information loss.",
+        intrinsic_score=1.0,
+    )
+
+    # Wire bundle: all prerequisites point UP into VAE
+    engine.add_bundle(vae, [bayes, kl, bottleneck])
+
+    # Higher-level concept: Bayesian Neural Networks (BNNs) building on VAE
     bnn = ConceptBlueprint(
         id="bayesian-neural-networks",
         title="Bayesian Neural Networks (BNNs)",
@@ -106,22 +110,11 @@ def cmd_init(args) -> None:
     )
     engine.add_concept(bnn)
 
-    # Wire VAE and Bayes pointing UP into Bayesian Neural Networks
-    engine.connect(
-        source_id="variational-autoencoders",
-        target_id="bayesian-neural-networks",
-        strength=0.85,
-        context_role="Provides the variational approximation framework (ELBO) applied to network weights.",
-    )
-    engine.connect(
-        source_id="bayes-theorem",
-        target_id="bayesian-neural-networks",
-        strength=0.90,
-        context_role="Formulates weight posterior p(w|D) = p(D|w)p(w)/p(D).",
-    )
+    # Wire upward connections into BNN
+    engine.connect("variational-autoencoders", "bayesian-neural-networks", strength=0.85)
+    engine.connect("bayes-theorem", "bayesian-neural-networks", strength=0.90)
 
     # Set one deliberately frayed connection to demonstrate study surfacing
-    # For instance: Bayes' Theorem connection into VAE is frayed!
     engine.review_joint("bayes-theorem", "variational-autoencoders", score=0.40)
 
     save_graph(engine, args.graph)
@@ -143,23 +136,22 @@ def cmd_study(args) -> None:
             "title": c.concept.title,
             "topic": c.concept.topic,
             "urgency_score": c.urgency_score,
-            "reason": c.reason,
-            "frayed_joint": (
+            "stability_score": c.stability_score,
+            "weak_upward_connection": (
                 {
-                    "source": c.frayed_connection.source_id,
-                    "target": c.frayed_connection.target_id,
+                    "target_id": c.frayed_connection.target_id,
                     "target_title": c.frayed_target.title if c.frayed_target else "",
                     "strength": c.frayed_connection.strength,
-                    "context_role": c.frayed_connection.context_role,
                 }
                 if c.frayed_connection
                 else None
             ),
-            "foundational_ingredients": [
+            "prerequisites": [
                 {"id": ing.id, "title": ing.title} for ing in c.foundational_ingredients
             ],
             "mental_model": c.concept.mental_model,
             "anchor_example": c.concept.anchor_example,
+            "pitfalls": c.concept.pitfalls,
         }
         output.append(item)
 
@@ -186,7 +178,6 @@ def cmd_inspect(args) -> None:
                 "target_id": conn.target_id,
                 "target_title": engine.concepts[conn.target_id].title if conn.target_id in engine.concepts else "",
                 "connection_strength": conn.strength,
-                "context_role": conn.context_role,
             }
             for conn in outgoing
         ],
@@ -195,7 +186,6 @@ def cmd_inspect(args) -> None:
                 "source_id": conn.source_id,
                 "source_title": engine.concepts[conn.source_id].title if conn.source_id in engine.concepts else "",
                 "connection_strength": conn.strength,
-                "context_role": conn.context_role,
             }
             for conn in incoming
         ],
@@ -262,7 +252,7 @@ def cmd_add_concept(args) -> None:
 
 
 def cmd_add_bundle(args) -> None:
-    """Record an 'aha!' learning session: add target concept and wire checkpoints pointing UP to it."""
+    """Record a learning session: add concept and wire its prerequisites pointing UP to it."""
     engine = _get_engine(args.graph)
     if args.file:
         with open(args.file, "r", encoding="utf-8") as f:
@@ -273,40 +263,49 @@ def cmd_add_bundle(args) -> None:
         print("Error: Must provide either --data JSON string or --file path.", file=sys.stderr)
         sys.exit(1)
 
-    target_data = data["target"]
-    target_id = target_data.get("id") or slugify(target_data["title"])
-    target_bp = ConceptBlueprint(
-        id=target_id,
-        title=target_data["title"],
-        topic=target_data.get("topic", "General"),
-        mental_model=target_data["mental_model"],
-        anchor_example=target_data.get("anchor_example", ""),
-        pitfalls=target_data.get("pitfalls", ""),
-        intrinsic_score=float(target_data.get("intrinsic_score", 1.0)),
+    # Accept "concept" or "target"
+    c_data = data.get("concept") or data.get("target")
+    if not c_data:
+        print("Error: JSON must include 'concept' object.", file=sys.stderr)
+        sys.exit(1)
+
+    c_id = c_data.get("id") or slugify(c_data["title"])
+    main_bp = ConceptBlueprint(
+        id=c_id,
+        title=c_data["title"],
+        topic=c_data.get("topic", "General"),
+        mental_model=c_data["mental_model"],
+        anchor_example=c_data.get("anchor_example", ""),
+        pitfalls=c_data.get("pitfalls", ""),
+        intrinsic_score=float(c_data.get("intrinsic_score", 1.0)),
     )
 
-    checkpoints = [
-        CheckpointSpec(
-            title=cp["title"],
-            topic=cp.get("topic"),
-            mental_model=cp["mental_model"],
-            anchor_example=cp.get("anchor_example", ""),
-            pitfalls=cp.get("pitfalls", ""),
-            context_role=cp.get("context_role", "prerequisite ingredient"),
+    # Accept "prerequisites" or "checkpoints"
+    raw_prereqs = data.get("prerequisites") or data.get("checkpoints") or []
+    prereq_bps = []
+    for p in raw_prereqs:
+        pid = p.get("id") or slugify(p["title"])
+        bp = ConceptBlueprint(
+            id=pid,
+            title=p["title"],
+            topic=p.get("topic") or main_bp.topic,
+            mental_model=p["mental_model"],
+            anchor_example=p.get("anchor_example", ""),
+            pitfalls=p.get("pitfalls", ""),
+            intrinsic_score=float(p.get("intrinsic_score", 1.0)),
         )
-        for cp in data.get("checkpoints", [])
-    ]
+        prereq_bps.append(bp)
 
-    res = engine.add_bundle(target_bp, checkpoints)
+    res = engine.add_bundle(main_bp, prereq_bps)
     save_graph(engine, args.graph)
 
     print(json.dumps({
         "status": "bundle_created",
-        "target_id": res["target"].id,
-        "target_title": res["target"].title,
-        "checkpoints_created": [cp.title for cp in res["checkpoints"]],
+        "concept_id": res["concept"].id,
+        "title": res["concept"].title,
+        "prerequisites_created": [p.title for p in res["prerequisites"]],
         "connections_wired": [
-            {"from": c.source_id, "to": c.target_id, "role": c.context_role}
+            {"from": c.source_id, "to": c.target_id, "strength": c.strength}
             for c in res["connections"]
         ],
     }, indent=2))
@@ -335,8 +334,6 @@ def cmd_graph(args) -> None:
                 tgt_title = engine.concepts[out.target_id].title if out.target_id in engine.concepts else out.target_id
                 bar = "█" * int(out.strength * 10) + "░" * (10 - int(out.strength * 10))
                 print(f"         └───[{bar} {out.strength:.2f}]──► {tgt_title}")
-                if out.context_role:
-                    print(f"              Role: {out.context_role}")
         else:
             print("       └── (Frontier Leaf Node: Top of current knowledge horizon)")
 
@@ -376,10 +373,6 @@ def main() -> None:
     p_review.add_argument("--score", type=float, required=True, help="Health score in [0.0, 1.0]")
     p_review.set_defaults(func=cmd_review)
 
-    # Graph
-    p_graph = subparsers.add_parser("graph", help="Print ASCII overview of the directed network")
-    p_graph.set_defaults(func=cmd_graph)
-
     # Add Concept
     p_add_c = subparsers.add_parser("add-concept", help="Add a single concept blueprint")
     p_add_c.add_argument("--data", help="JSON string of concept data")
@@ -393,10 +386,14 @@ def main() -> None:
     p_add_c.set_defaults(func=cmd_add_concept)
 
     # Add Bundle
-    p_bundle = subparsers.add_parser("add-bundle", help="Add target concept and wire checkpoints pointing UP")
+    p_bundle = subparsers.add_parser("add-bundle", help="Add concept and wire prerequisites pointing UP to it")
     p_bundle.add_argument("--data", help="JSON string representing the bundle")
     p_bundle.add_argument("--file", help="Path to JSON file representing the bundle")
     p_bundle.set_defaults(func=cmd_add_bundle)
+
+    # Graph
+    p_graph = subparsers.add_parser("graph", help="Print ASCII overview of the directed network")
+    p_graph.set_defaults(func=cmd_graph)
 
     args = parser.parse_args()
     args.func(args)

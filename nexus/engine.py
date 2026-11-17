@@ -7,7 +7,6 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from nexus.models import (
-    CheckpointSpec,
     ConceptBlueprint,
     Connection,
     StudyCandidate,
@@ -28,26 +27,22 @@ class NexusEngine:
         - UPWARD (_adj_up): [Prerequisite] ──(w)──► [Higher Application] (where concept is applied)
         - DOWNWARD (_adj_down): [Higher Application] ◄──(w)── [Prerequisite] (what concept is composed of)
 
-    Selection scans UPWARD: concepts with weak outgoing connections into higher applications
-    are prioritized for study, packaged together with their foundational ingredients retrieved
-    via instant DOWNWARD pointers.
+    The only thing creating the hierarchy is the connection strength w in [0.0, 1.0].
+    Every concept is an identical, full-fidelity ConceptBlueprint.
     """
 
     def __init__(self) -> None:
         self.concepts: Dict[str, ConceptBlueprint] = {}
         self.connections: List[Connection] = []
-        # Bidirectional adjacency indices for O(1) navigation
         self._adj_up: Dict[str, List[Connection]] = defaultdict(list)    # source_id -> outgoing connections
         self._adj_down: Dict[str, List[Connection]] = defaultdict(list)  # target_id -> incoming connections
 
     def _index_connection(self, conn: Connection) -> None:
         """Register a connection in both the upward and downward adjacency indices."""
-        # Update or append in _adj_up
         up_list = self._adj_up[conn.source_id]
         if conn not in up_list:
             up_list.append(conn)
 
-        # Update or append in _adj_down
         down_list = self._adj_down[conn.target_id]
         if conn not in down_list:
             down_list.append(conn)
@@ -74,14 +69,8 @@ class NexusEngine:
         source_id: str,
         target_id: str,
         strength: float = 1.0,
-        context_role: str = "",
     ) -> Connection:
-        """Create or update a directed connection between prerequisite and higher concept.
-
-        Maintains instant pointers in both directions:
-        - source_id registers an UPWARD pointer to target_id.
-        - target_id registers a DOWNWARD pointer to source_id.
-        """
+        """Create or update a directed connection between prerequisite and higher concept."""
         if source_id not in self.concepts:
             raise KeyError(f"Source concept {source_id!r} not found in graph")
         if target_id not in self.concepts:
@@ -93,15 +82,12 @@ class NexusEngine:
         for conn in self._adj_up.get(source_id, []):
             if conn.target_id == target_id:
                 conn.strength = clamped
-                if context_role:
-                    conn.context_role = context_role
                 return conn
 
         conn = Connection(
             source_id=source_id,
             target_id=target_id,
             strength=clamped,
-            context_role=context_role,
         )
         self.connections.append(conn)
         self._index_connection(conn)
@@ -109,58 +95,49 @@ class NexusEngine:
 
     def add_bundle(
         self,
-        target_blueprint: ConceptBlueprint,
-        checkpoints: List[CheckpointSpec],
+        concept: ConceptBlueprint,
+        prerequisites: List[ConceptBlueprint],
     ) -> Dict[str, Any]:
-        """Record an 'aha!' learning session: creates the main concept, creates/updates checkpoints,
+        """Record a learning session: adds the main concept, adds all prerequisites,
 
-        and wires directed connections pointing UP from each checkpoint into the main concept.
+        and wires connections pointing UP from each prerequisite into the main concept.
+        Every concept is stored as an identical full ConceptBlueprint.
         """
         # 1. Save the main concept
-        self.add_concept(target_blueprint)
+        self.add_concept(concept)
 
-        created_checkpoints: List[ConceptBlueprint] = []
+        saved_prereqs: List[ConceptBlueprint] = []
         created_connections: List[Connection] = []
 
-        # 2. Process each checkpoint
-        for cp in checkpoints:
-            cp_id = slugify(cp.title)
-            # Re-use existing concept if present, updating if new details are provided
-            if cp_id in self.concepts:
-                existing = self.concepts[cp_id]
-                if cp.mental_model and len(cp.mental_model) > len(existing.mental_model):
-                    existing.mental_model = cp.mental_model
-                if cp.anchor_example and not existing.anchor_example:
-                    existing.anchor_example = cp.anchor_example
-                if cp.pitfalls and not existing.pitfalls:
-                    existing.pitfalls = cp.pitfalls
-                blueprint = self.add_concept(existing)
+        # 2. Process each prerequisite concept
+        for p in prerequisites:
+            pid = p.id or slugify(p.title)
+            p.id = pid
+            if pid in self.concepts:
+                existing = self.concepts[pid]
+                if p.mental_model and len(p.mental_model) > len(existing.mental_model):
+                    existing.mental_model = p.mental_model
+                if p.anchor_example and not existing.anchor_example:
+                    existing.anchor_example = p.anchor_example
+                if p.pitfalls and not existing.pitfalls:
+                    existing.pitfalls = p.pitfalls
+                bp = self.add_concept(existing)
             else:
-                blueprint = ConceptBlueprint(
-                    id=cp_id,
-                    title=cp.title,
-                    topic=cp.topic or target_blueprint.topic,
-                    mental_model=cp.mental_model,
-                    anchor_example=cp.anchor_example,
-                    pitfalls=cp.pitfalls,
-                    intrinsic_score=1.0,
-                )
-                self.add_concept(blueprint)
+                bp = self.add_concept(p)
 
-            created_checkpoints.append(blueprint)
+            saved_prereqs.append(bp)
 
-            # 3. Wire upward connection: checkpoint ---> main concept
+            # 3. Wire upward connection: prerequisite ---> main concept
             conn = self.connect(
-                source_id=blueprint.id,
-                target_id=target_blueprint.id,
+                source_id=bp.id,
+                target_id=concept.id,
                 strength=1.0,
-                context_role=cp.context_role,
             )
             created_connections.append(conn)
 
         return {
-            "target": target_blueprint,
-            "checkpoints": created_checkpoints,
+            "concept": concept,
+            "prerequisites": saved_prereqs,
             "connections": created_connections,
         }
 
@@ -177,11 +154,11 @@ class NexusEngine:
         return list(self._adj_down.get(concept_id, []))
 
     def get_components(self, concept_id: str) -> List[Connection]:
-        """Look DOWN: explicit top-down query retrieving all component ingredients of a parent concept."""
+        """Look DOWN: retrieve all component connections of a parent concept."""
         return self.get_incoming(concept_id)
 
     def get_applications(self, concept_id: str) -> List[Connection]:
-        """Look UP: explicit bottom-up query retrieving all higher-level applications of a prerequisite."""
+        """Look UP: retrieve all higher-level application connections of a prerequisite."""
         return self.get_outgoing(concept_id)
 
     def get_foundational_ingredients(self, concept_id: str) -> List[ConceptBlueprint]:
@@ -212,7 +189,6 @@ class NexusEngine:
         k = len(outgoing)
 
         if k == 0:
-            # Frontier leaf node with no higher-level concepts yet
             return {
                 "concept_id": concept_id,
                 "breadth_k": 0,
@@ -226,7 +202,6 @@ class NexusEngine:
         strengths = [c.strength for c in outgoing]
         avg_s = float(sum(strengths) / k)
         min_s = float(min(strengths))
-        # Diminishing return breadth multiplier: 1.0 at K=0, 1.35 at K=1, 1.69 at K=3, 2.04 at K=7
         breadth_bonus = 1.0 + 0.5 * math.log(1.0 + k)
         stability = avg_s * breadth_bonus
 
@@ -245,34 +220,19 @@ class NexusEngine:
 
         Scans for frayed connections (connections with lowest strength w < 0.95),
         prioritizing foundational concepts whose weakness compromises higher structures.
-        Each candidate is packaged with:
-        - The weak concept blueprint.
-        - The specific higher-level target where the connection is frayed.
-        - The foundational children needed to rebuild the concept from below.
         """
         candidates: List[StudyCandidate] = []
 
-        # 1. Evaluate every concept with outgoing connections
         for cid, concept in self.concepts.items():
             outgoing = self.get_outgoing(cid)
             metrics = self.calculate_concept_stability(cid)
 
             if outgoing:
-                # Find the weakest upward connection for this concept
                 sorted_links = sorted(outgoing, key=lambda c: c.strength)
                 weakest_link = sorted_links[0]
-
-                # Urgency is driven by the deficit on the weakest link
-                # (1.0 - strength) boosted by foundational breadth (number of things relying on it)
                 urgency = (1.0 - weakest_link.strength) * (1.0 + 0.3 * math.log(1.0 + len(outgoing)))
-
                 target_concept = self.concepts.get(weakest_link.target_id)
                 ingredients = self.get_foundational_ingredients(cid)
-
-                reason = (
-                    f"Frayed connection ({weakest_link.strength:.2f}) into {target_concept.title if target_concept else weakest_link.target_id}. "
-                    f"Context: {weakest_link.context_role or 'prerequisite role'}."
-                )
 
                 candidates.append(
                     StudyCandidate(
@@ -282,14 +242,11 @@ class NexusEngine:
                         frayed_target=target_concept,
                         frayed_connection=weakest_link,
                         foundational_ingredients=ingredients,
-                        reason=reason,
                     )
                 )
             else:
-                # Frontier leaf node with 0 outgoing connections
                 urgency = 1.0 - concept.intrinsic_score
                 ingredients = self.get_foundational_ingredients(cid)
-                reason = "Frontier leaf concept with 0 higher-level outgoing applications yet."
                 candidates.append(
                     StudyCandidate(
                         concept=concept,
@@ -298,11 +255,9 @@ class NexusEngine:
                         frayed_target=None,
                         frayed_connection=None,
                         foundational_ingredients=ingredients,
-                        reason=reason,
                     )
                 )
 
-        # Sort by urgency descending
         candidates.sort(key=lambda c: c.urgency_score, reverse=True)
         return candidates[:top_k]
 
@@ -316,11 +271,7 @@ class NexusEngine:
         target_id: str,
         score: float,
     ) -> Connection:
-        """Update the health of a specific directed connection (prerequisite -> target).
-
-        If score >= 0.8: connection strengthens.
-        If score < 0.8: connection weakens (frayed wire identified in Socratic chat).
-        """
+        """Update the health of a specific directed connection (prerequisite -> target)."""
         clamped = max(0.0, min(1.0, float(score)))
         conn = None
         for c in self.connections:

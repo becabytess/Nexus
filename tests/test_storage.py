@@ -28,7 +28,7 @@ def test_save_and_load_roundtrip():
         )
         engine.add_concept(bp1)
         engine.add_concept(bp2)
-        engine.connect("information-entropy", "cross-entropy-loss", strength=0.88, context_role="Foundation")
+        engine.connect("information-entropy", "cross-entropy-loss", strength=0.88)
 
         save_graph(engine, file_path)
         assert os.path.exists(file_path)
@@ -39,7 +39,6 @@ def test_save_and_load_roundtrip():
         assert loaded.concepts["information-entropy"].anchor_example == "Fair coin toss yields 1 bit of entropy."
         assert len(loaded.connections) == 1
         assert loaded.connections[0].strength == 0.88
-        assert loaded.connections[0].context_role == "Foundation"
 
 
 def test_load_nonexistent_returns_empty_engine():

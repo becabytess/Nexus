@@ -43,7 +43,7 @@ def test_cli_study_and_review():
         assert len(candidates) >= 1
         top_cand = candidates[0]
         assert top_cand["concept_id"] == "bayes-theorem"
-        assert top_cand["frayed_joint"]["strength"] == 0.40
+        assert top_cand["weak_upward_connection"]["strength"] == 0.40
 
         # Review
         res_rev = run_cli(
@@ -77,24 +77,24 @@ def test_cli_add_concept_and_bundle():
 
         # Add bundle
         bundle_json = json.dumps({
-            "target": {
+            "concept": {
                 "title": "Principal Component Analysis",
                 "topic": "Machine Learning",
                 "mental_model": "Orthogonal projection onto directions of maximum variance.",
             },
-            "checkpoints": [
+            "prerequisites": [
                 {
                     "title": "Covariance Matrix",
+                    "topic": "Linear Algebra",
                     "mental_model": "Matrix capturing pairwise variances and covariances.",
-                    "context_role": "Used to compute eigenvectors and eigenvalues.",
                 }
             ],
         })
         res_b = run_cli("add-bundle", "--data", bundle_json, graph_path=graph_file)
         assert res_b.returncode == 0
         b_data = json.loads(res_b.stdout)
-        assert b_data["target_id"] == "principal-component-analysis"
-        assert "Covariance Matrix" in b_data["checkpoints_created"]
+        assert b_data["concept_id"] == "principal-component-analysis"
+        assert "Covariance Matrix" in b_data["prerequisites_created"]
 
 
 def test_cli_graph():

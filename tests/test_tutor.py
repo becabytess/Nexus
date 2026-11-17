@@ -26,7 +26,6 @@ def test_socratic_study_brief_and_probe():
         source_id="bayes",
         target_id="vae",
         strength=0.45,
-        context_role="Formulates the intractable true posterior p(z|x) that requires variational approximation.",
     )
 
     candidates = engine.get_study_candidates(top_k=1)
@@ -35,7 +34,7 @@ def test_socratic_study_brief_and_probe():
 
     brief = SocraticTutor.build_study_brief(candidate)
     assert "Socratic Study Target: Bayes' Theorem" in brief
-    assert "Frayed Upward Joint" in brief
+    assert "Weak Upward Connection" in brief
     assert "Variational Autoencoder" in brief
     assert "0.45 / 1.00" in brief
     assert "STRICTLY NO analogies or metaphors" in brief

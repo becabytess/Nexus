@@ -11,10 +11,10 @@ def _now_iso() -> str:
 
 
 class ConceptBlueprint(BaseModel):
-    """A rich, high-fidelity personal blueprint of a concept's mental model."""
+    """A rich personal blueprint of a concept's mental model."""
 
     id: str = Field(..., description="Unique normalized concept slug, e.g. 'bayes-theorem'")
-    title: str = Field(..., description="Human-readable concept title")
+    title: str = Field(..., description="Concept title")
     topic: str = Field(default="General", description="Knowledge domain or category")
     mental_model: str = Field(
         ...,
@@ -22,7 +22,7 @@ class ConceptBlueprint(BaseModel):
     )
     anchor_example: str = Field(
         default="",
-        description="The specific intuitive example, derivation step, or concrete scenario that unlocked it",
+        description="Specific intuitive example, derivation step, or concrete scenario that unlocked it",
     )
     pitfalls: str = Field(
         default="",
@@ -32,14 +32,14 @@ class ConceptBlueprint(BaseModel):
         default=1.0,
         ge=0.0,
         le=1.0,
-        description="Self-anchored mastery score (primarily for frontier leaf nodes with 0 outgoing links)",
+        description="Baseline mastery score (primarily for frontier leaf nodes with 0 outgoing links)",
     )
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
 
 
 class Connection(BaseModel):
-    """A directed upward synapse representing the utility of a prerequisite inside a higher concept."""
+    """A directed upward connection from prerequisite to higher application."""
 
     source_id: str = Field(..., description="Prerequisite concept slug")
     target_id: str = Field(..., description="Higher-level application concept slug (pointing UP)")
@@ -47,11 +47,7 @@ class Connection(BaseModel):
         default=1.0,
         ge=0.0,
         le=1.0,
-        description="Connection health: how clearly the student understands source's role inside target",
-    )
-    context_role: str = Field(
-        default="",
-        description="The specific functional mechanism of how source is used inside target",
+        description="Connection strength in [0.0, 1.0]",
     )
     last_reviewed: Optional[str] = Field(default=None)
     review_count: int = Field(default=0, ge=0)
@@ -74,19 +70,4 @@ class StudyCandidate(BaseModel):
     foundational_ingredients: List[ConceptBlueprint] = Field(
         default_factory=list,
         description="Inbound prerequisite blueprints needed to reconstruct this concept from the ground up",
-    )
-    reason: str = Field(..., description="Clear explanation of why this was surfaced")
-
-
-class CheckpointSpec(BaseModel):
-    """Specification for a supporting checkpoint concept during bundle creation."""
-
-    title: str
-    topic: Optional[str] = None
-    mental_model: str
-    anchor_example: str = ""
-    pitfalls: str = ""
-    context_role: str = Field(
-        ...,
-        description="How this checkpoint specifically functions inside the target concept",
     )

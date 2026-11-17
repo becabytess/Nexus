@@ -8,7 +8,7 @@ from nexus.models import ConceptBlueprint, Connection, StudyCandidate
 class SocraticTutor:
     """Pedagogical scaffolding engine for Nexus.
 
-    Generates mechanism-level Socratic inquiries focused on frayed upward connections,
+    Generates mechanism-level Socratic inquiries focused on weak upward connections,
     linking foundational ingredients into higher-level applications without metaphors.
     """
 
@@ -17,10 +17,9 @@ class SocraticTutor:
         """Construct a structured Socratic review brief for an agent or student."""
         lines = []
         lines.append(f"# Socratic Study Target: {candidate.concept.title}")
-        lines.append(f"**Domain**: {candidate.concept.topic} | **Urgency**: {candidate.urgency_score:.2f} | **Stability**: {candidate.stability_score:.2f}")
-        lines.append(f"**Surfacing Rationale**: {candidate.reason}\n")
+        lines.append(f"**Domain**: {candidate.concept.topic} | **Urgency**: {candidate.urgency_score:.2f} | **Stability**: {candidate.stability_score:.2f}\n")
 
-        lines.append("## Personal Blueprint (Stored Mental Model)")
+        lines.append("## Concept Blueprint")
         lines.append(f"- **Mechanism**: {candidate.concept.mental_model}")
         if candidate.concept.anchor_example:
             lines.append(f"- **Anchor Example**: {candidate.concept.anchor_example}")
@@ -28,14 +27,13 @@ class SocraticTutor:
             lines.append(f"- **Pitfalls / Anti-patterns**: {candidate.concept.pitfalls}")
 
         if candidate.frayed_target and candidate.frayed_connection:
-            lines.append("\n## Frayed Upward Joint (Primary Pedagogical Focus)")
-            lines.append(f"- **Higher Target**: {candidate.frayed_target.title}")
-            lines.append(f"- **Current Joint Health**: {candidate.frayed_connection.strength:.2f} / 1.00")
-            lines.append(f"- **Functional Role**: {candidate.frayed_connection.context_role}")
+            lines.append("\n## Weak Upward Connection")
+            lines.append(f"- **Target Application**: {candidate.frayed_target.title}")
+            lines.append(f"- **Connection Strength**: {candidate.frayed_connection.strength:.2f} / 1.00")
             lines.append(f"- **Target Mechanism**: {candidate.frayed_target.mental_model}")
 
         if candidate.foundational_ingredients:
-            lines.append("\n## Foundational Ingredients (Building Blocks from Below)")
+            lines.append("\n## Foundational Ingredients")
             for ing in candidate.foundational_ingredients:
                 lines.append(f"- **{ing.title}** ({ing.topic}): {ing.mental_model}")
 
@@ -57,12 +55,9 @@ class SocraticTutor:
 
         source = candidate.concept.title
         target = candidate.frayed_target.title
-        role = candidate.frayed_connection.context_role
 
         return (
-            f"Regarding {target}: your understanding of {source} in isolation is recorded, "
-            f"but its operational integration inside {target} is currently weak ({candidate.frayed_connection.strength:.2f}).\n\n"
-            f"Specifically: {role}\n\n"
-            f"Without using analogies, walk through the exact mathematical or algorithmic step where {source} "
-            f"becomes necessary inside {target}. What specific failure mode or mathematical impossibility arises if {source} is omitted?"
+            f"Regarding {target}: your recorded understanding of {source} in relation to {target} is weak ({candidate.frayed_connection.strength:.2f}).\n\n"
+            f"Without using analogies, explain how {source} functions in {target}. "
+            f"What specific failure mode or mathematical impossibility arises if {source} is omitted?"
         )

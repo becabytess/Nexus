@@ -7,7 +7,6 @@ to identify frayed connections holding up complex cognitive structures.
 
 from nexus.engine import NexusEngine, slugify
 from nexus.models import (
-    CheckpointSpec,
     ConceptBlueprint,
     Connection,
     StudyCandidate,
@@ -20,7 +19,6 @@ __all__ = [
     "ConceptBlueprint",
     "Connection",
     "StudyCandidate",
-    "CheckpointSpec",
     "SocraticTutor",
     "slugify",
     "save_graph",

@@ -1,6 +1,6 @@
 # Nexus: Directed Cognitive Blueprint & Connection-Strength Knowledge Engine
 
-> **A graph-native cognitive architecture where concepts are rich personal mental models, connections point UPWARD into higher applications, and review surfaces frayed wires holding up complex reasoning structures.**
+> **A graph-native cognitive architecture where concepts are rich personal mental models, connections point UPWARD into higher applications, and review surfaces weak connections holding up complex reasoning structures.**
 
 ---
 
@@ -11,26 +11,26 @@ Traditional spaced repetition systems (Anki, SM-2, FSRS) treat knowledge as disc
 2. **Symmetric Blame**: If you fail to derive a complex framework (e.g. VAE), a flat system weakens the VAE node, yet cannot diagnose *which* underlying mathematical prerequisite broke down.
 
 **Nexus replaces flat cards and scalar masses with a directed cognitive dependency graph:**
-- Concepts are stored as **rich personal blueprints** (the student's verified mental model, anchor examples, and overcome pitfalls—not generic textbook definitions).
+- Concepts are stored as **rich personal blueprints** (the student's verified mental model, anchor examples, and overcome pitfalls—not generic textbook definitions). **All concepts share the exact same schema; no concept is intrinsically special or different.**
 - Directed edges strictly point **UPWARD** from prerequisites into the higher-level applications that depend on them:
   $$[\text{Prerequisite}] \xrightarrow{\quad\text{strength } w \in [0.0, 1.0]\quad} [\text{Higher Application}]$$
-- Understanding is evaluated **in context**: a prerequisite is mastered when its outgoing connections to higher-level concepts are resilient and strong.
+- **The connection strength $w$ alone creates the hierarchy.** The LLM understands how concepts relate directly from the blueprints.
 
 ---
 
-## 2. Core Mathematical Architecture
+## 2. Core Architecture
 
 ### 2.1 Directed Upward Topology
-Every connection $e = (u, v)$ with weight $w \in [0, 1]$ represents the functional integration of prerequisite $u$ inside target application $v$.
+Every connection $e = (u, v)$ with weight $w \in [0, 1]$ represents the strength of prerequisite $u$ supporting target application $v$.
 
 ```
 [Variational Autoencoders] ◄───(w = 0.85)───┐
       ▲                                      │
-      │ (w = 0.40, Frayed!)                  │
+      │ (w = 0.40, Weak!)                    │
 [Bayes' Theorem] ───────────────(w = 0.90)──► [Bayesian Neural Networks]
 ```
 
-When reviewing Bayes' Theorem, Nexus looks **UPWARD** at its outgoing connections. If its joint into VAE is frayed ($w = 0.40$) while its joint into BNN is sound ($w = 0.90$), the tutor targets the exact failure mode inside VAE.
+When reviewing Bayes' Theorem, Nexus looks **UPWARD** at its outgoing connections. If its joint into VAE is weak ($w = 0.40$) while its joint into BNN is sound ($w = 0.90$), the tutor targets the exact failure mode inside VAE.
 
 ### 2.2 Stability Metric: Quality $\times$ Breadth
 A concept applied across many distinct domains is far more consolidated than a concept learned in a single chapter. To avoid high volume faking mastery, Nexus computes concept stability as the product of **average connection quality** and a concave **breadth multiplier**:
@@ -51,7 +51,7 @@ where:
 
 ### 2.3 Asymmetric Socratic Diagnosis
 - **Mastering a high-level application** ($A \to B$ correct): Reinforces all inbound prerequisite joints feeding $B$.
-- **Struggling on a high-level application**: The LLM tutor inspects the inbound prerequisites, identifies the specific frayed wire via targeted dialogue, and weakens **only** that connection ($w \leftarrow \text{score}$), preserving undamaged prerequisites.
+- **Struggling on a high-level application**: The LLM tutor inspects the inbound prerequisites, identifies the specific weak link via targeted dialogue, and weakens **only** that connection ($w \leftarrow \text{score}$), preserving undamaged prerequisites.
 
 ---
 
@@ -64,15 +64,15 @@ python -m pip install -e .
 ```
 
 ### 3.2 Initialize Demo Network
-Pre-seeds a realistic deep learning network (VAEs, BNNs, Bayes' Theorem, KL Divergence, Latent Space Bottleneck) with an intentional frayed link:
+Pre-seeds a realistic deep learning network (VAEs, BNNs, Bayes' Theorem, KL Divergence, Latent Space Bottleneck) with an intentional weak link:
 ```bash
 python -m nexus.cli init
 ```
 
 ### 3.3 Study Selection (Scanning Upward)
-Surfaces the most urgent concepts whose upward joints are frayed:
+Surfaces the most urgent concepts whose upward joints are weak:
 ```bash
-python -m nexus.cli study --top-k 2
+python -m nexus.cli study --top-k 1
 ```
 Output:
 ```json
@@ -81,15 +81,16 @@ Output:
     "concept_id": "bayes-theorem",
     "title": "Bayes' Theorem",
     "topic": "Probability",
-    "urgency_score": 0.7246,
-    "reason": "Frayed connection (0.40) into Variational Autoencoders (VAEs). Context: Formulates the true intractable posterior p(z|x) = p(x|z)p(z)/p(x) that VAE approximates with q(z|x).",
-    "frayed_joint": {
-      "source": "bayes-theorem",
-      "target": "variational-autoencoders",
+    "urgency_score": 0.7978,
+    "stability_score": 1.0069,
+    "weak_upward_connection": {
+      "target_id": "variational-autoencoders",
       "target_title": "Variational Autoencoders (VAEs)",
-      "strength": 0.4,
-      "context_role": "Formulates the true intractable posterior p(z|x) = p(x|z)p(z)/p(x) that VAE approximates with q(z|x)."
-    }
+      "strength": 0.4
+    },
+    "prerequisites": [],
+    "mental_model": "Belief re-weighting under evidence...",
+    "anchor_example": "Medical testing: high false-positive rates when the prior prevalence is low."
   }
 ]
 ```
@@ -107,19 +108,19 @@ python -m nexus.cli review --source bayes-theorem --target variational-autoencod
 ```
 
 ### 3.6 Spontaneous Bundle Crystallization
-Record an "aha!" moment by adding a target concept and its supporting checkpoints in one call:
+Record an "aha!" moment by adding a concept and its supporting prerequisites in one call. Both main concept and prerequisites share the identical blueprint schema:
 ```bash
 python -m nexus.cli add-bundle --data '{
-  "target": {
+  "concept": {
     "title": "Diffusion Models",
     "topic": "Generative Models",
     "mental_model": "Inverting a forward Gaussian noise process via learned score matching."
   },
-  "checkpoints": [
+  "prerequisites": [
     {
       "title": "Langevin Dynamics",
-      "mental_model": "Sampling from unnormalized densities using gradient of log-density.",
-      "context_role": "Provides the sampling trajectory for reverse diffusion."
+      "topic": "Physics/Statistics",
+      "mental_model": "Sampling from unnormalized densities using gradient of log-density."
     }
   ]
 }'
@@ -138,5 +139,4 @@ Run the full pytest suite:
 ```bash
 python -m pytest tests -v
 ```
-
-All 14 tests cover graph operations, upward candidate selection, stability formulas, persistence roundtripping, Socratic scaffolding, and CLI commands.
+All 14 tests pass.
