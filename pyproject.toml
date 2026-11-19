@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus"
-version = "0.1.0"
+version = "0.3.0"
 description = "Nexus: Directed Cognitive Blueprint & Connection-Strength Knowledge Engine"
 authors = [{ name = "becabytess" }]
 readme = "README.md"
@@ -12,6 +12,9 @@ requires-python = ">=3.9"
 dependencies = [
     "pydantic>=2.0.0",
 ]
+
+[project.scripts]
+nexus = "nexus.cli:main"
 
 [project.optional-dependencies]
 dev = [

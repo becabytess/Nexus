@@ -1,217 +1,249 @@
-"""Tests for Nexus graph engine: directed upward dependencies, stability, and retrieval."""
-import math
+"""Tests for Nexus graph engine: DAG safety, decay, spacing, dual urgency, diagnostics, and FIRe."""
+from datetime import datetime, timedelta, timezone
 import pytest
-from nexus.engine import NexusEngine, slugify
-from nexus.models import ConceptBlueprint, Connection
+
+from nexus.engine import NexusEngine, breadth_multiplier, slugify
+from nexus.models import ConceptBlueprint
+
+
+def _t(days: float = 0.0) -> datetime:
+    return datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc) + timedelta(days=days)
 
 
 def test_slugify():
     assert slugify("Variational Autoencoders (VAEs)") == "variational-autoencoders-vaes"
     assert slugify("Bayes' Theorem") == "bayes-theorem"
-    assert slugify("  Linear   Algebra  ") == "linear-algebra"
+    assert slugify("  Linear_Algebra   101 ") == "linear-algebra-101"
+    with pytest.raises(ValueError):
+        slugify("???")
 
 
-def test_add_concept_and_lookup():
+def test_add_update_remove_and_disconnect():
     engine = NexusEngine()
-    bp = ConceptBlueprint(
-        id="linear-regression",
-        title="Linear Regression",
-        topic="Statistics",
-        content="# Linear Regression\n\nOrdinary least squares regression.",
-        intrinsic_score=0.9,
-    )
-    engine.add_concept(bp)
+    bp1 = ConceptBlueprint(id="a", title="A", topic="Math", content="# A", intrinsic_score=0.9)
+    bp2 = ConceptBlueprint(id="b", title="B", topic="Math", content="# B")
+    engine.add_concept(bp1)
+    engine.add_concept(bp2)
 
-    assert "linear-regression" in engine.concepts
-    retrieved = engine.concepts["linear-regression"]
-    assert retrieved.title == "Linear Regression"
-    assert retrieved.intrinsic_score == 0.9
+    orig_created = engine.concepts["a"].created_at
+    engine.add_concept(ConceptBlueprint(id="a", title="A Revised", topic="Math", content="# A v2"))
+    assert engine.concepts["a"].title == "A Revised"
+    assert engine.concepts["a"].created_at == orig_created
 
-
-def test_connect_upward_and_directions():
-    engine = NexusEngine()
-    c1 = ConceptBlueprint(
-        id="matrix-multiplication",
-        title="Matrix Multiplication",
-        content="# Matrix Multiplication\n\nLinear transformation composition.",
-    )
-    c2 = ConceptBlueprint(
-        id="neural-network-layer",
-        title="Neural Network Layer",
-        content="# Neural Network Layer\n\nAffine map followed by non-linear activation.",
-    )
-    engine.add_concept(c1)
-    engine.add_concept(c2)
-
-    # Wire pointing UP: matrix-multiplication ---> neural-network-layer
-    conn = engine.connect(
-        source_id="matrix-multiplication",
-        target_id="neural-network-layer",
-        strength=0.95,
-    )
-
-    assert conn.strength == 0.95
+    engine.connect("a", "b", strength=0.8)
     assert len(engine.connections) == 1
 
-    # Looking UP from ingredient
-    outgoing = engine.get_outgoing("matrix-multiplication")
-    assert len(outgoing) == 1
-    assert outgoing[0].target_id == "neural-network-layer"
+    engine.disconnect("a", "b")
+    assert len(engine.connections) == 0
+    assert engine.get_outgoing("a") == []
+    assert engine.get_incoming("b") == []
 
-    # Looking DOWN from higher concept
-    incoming = engine.get_incoming("neural-network-layer")
-    assert len(incoming) == 1
-    assert incoming[0].source_id == "matrix-multiplication"
-
-    # Inbound ingredients (direct top-down pointers)
-    ingredients = engine.get_foundational_ingredients("neural-network-layer")
-    assert len(ingredients) == 1
-    assert ingredients[0].id == "matrix-multiplication"
-
-    # Explicit top-down component retrieval
-    components = engine.get_components("neural-network-layer")
-    assert len(components) == 1
-    assert components[0].source_id == "matrix-multiplication"
-
-    # Higher applications (bottom-up pointers)
-    higher = engine.get_higher_applications("matrix-multiplication")
-    assert len(higher) == 1
-    assert higher[0].id == "neural-network-layer"
-
-    applications = engine.get_applications("matrix-multiplication")
-    assert len(applications) == 1
-    assert applications[0].target_id == "neural-network-layer"
+    engine.connect("a", "b", strength=0.8)
+    engine.remove_concept("a")
+    assert "a" not in engine.concepts
+    assert len(engine.connections) == 0
+    assert engine.get_incoming("b") == []
 
 
-def test_add_bundle():
+def test_connect_rejects_self_loops_and_cycles():
     engine = NexusEngine()
-    target = ConceptBlueprint(
-        id="variational-autoencoders",
-        title="Variational Autoencoders",
-        topic="Generative Models",
-        content="# Variational Autoencoders\n\nELBO optimization.",
+    for cid in ("a", "b", "c"):
+        engine.add_concept(ConceptBlueprint(id=cid, title=cid.upper(), content=f"# {cid}"))
+
+    with pytest.raises(ValueError, match="itself"):
+        engine.connect("a", "a")
+
+    engine.connect("a", "b")
+    engine.connect("b", "c")
+
+    updated = engine.connect("a", "b", strength=0.6)
+    assert updated.strength == 0.6
+
+    with pytest.raises(ValueError, match="cycle"):
+        engine.connect("c", "a")
+    with pytest.raises(ValueError, match="cycle"):
+        engine.connect("b", "a")
+
+
+def test_add_bundle_reuses_existing_and_preserves_frayed_links():
+    engine = NexusEngine()
+    t0 = _t(0)
+    vae = ConceptBlueprint(id="vae", title="VAE", topic="DL", content="# VAE")
+    bayes = ConceptBlueprint(id="bayes", title="Bayes", topic="Prob", content="# Bayes\n\nDetailed explainer.")
+    kl = ConceptBlueprint(id="kl", title="KL", topic="Info", content="# KL")
+
+    engine.add_bundle(vae, [bayes, kl])
+    engine.review_joint("bayes", "vae", score=0.40, now=t0)
+
+    bottleneck = ConceptBlueprint(id="bottleneck", title="Bottleneck", content="# Bottleneck")
+    res = engine.add_bundle(
+        ConceptBlueprint(id="vae", title="VAE", topic="DL", content="# VAE\n\nExpanded."),
+        ["bayes", bottleneck],
     )
-    prereqs = [
-        ConceptBlueprint(
-            id="bayes-theorem",
-            title="Bayes' Theorem",
-            content="# Bayes Theorem\n\nPosterior inference.",
-        ),
-        ConceptBlueprint(
-            id="kl-divergence",
-            title="KL Divergence",
-            content="# KL Divergence\n\nRelative entropy.",
-        ),
-    ]
 
-    res = engine.add_bundle(target, prereqs)
-
-    assert len(engine.concepts) == 3
-    assert "variational-autoencoders" in engine.concepts
-    assert "bayes-theorem" in engine.concepts
-    assert "kl-divergence" in engine.concepts
-
-    # Check that connections strictly point UP into target
-    assert len(engine.connections) == 2
-    for conn in engine.connections:
-        assert conn.target_id == "variational-autoencoders"
-        assert conn.strength == 1.0
+    assert len(res["prerequisites"]) == 2
+    assert engine.get_connection("bayes", "vae").strength == 0.40
+    assert engine.get_connection("bottleneck", "vae").strength == 1.0
+    assert "Detailed explainer." in engine.concepts["bayes"].content
 
 
-def test_stability_formula_diminishing_returns():
+def test_stability_formula_and_breadth_anchored_decay():
     engine = NexusEngine()
+    t0 = _t(0)
 
-    # Leaf node (K = 0)
     leaf = ConceptBlueprint(
-        id="frontier-concept",
-        title="Frontier Concept",
-        content="# Frontier Concept\n\nTop of knowledge horizon.",
-        intrinsic_score=0.85,
+        id="leaf", title="Leaf", content="# Leaf", intrinsic_score=0.85, created_at=t0.isoformat()
     )
     engine.add_concept(leaf)
-
-    m_leaf = engine.calculate_concept_stability("frontier-concept")
+    m_leaf = engine.calculate_concept_stability("leaf", now=t0)
     assert m_leaf["breadth_k"] == 0
     assert m_leaf["stability"] == 0.85
     assert m_leaf["is_frontier_leaf"] is True
 
-    # Prerequisite concept with multiple outgoing connections
-    prereq = ConceptBlueprint(
-        id="svd",
-        title="Singular Value Decomposition",
-        content="# SVD\n\nMatrix factorization.",
-    )
-    engine.add_concept(prereq)
+    broad = ConceptBlueprint(id="svd", title="SVD", content="# SVD", created_at=t0.isoformat())
+    narrow = ConceptBlueprint(id="narrow", title="Narrow", content="# Narrow", created_at=t0.isoformat())
+    engine.add_concept(broad)
+    engine.add_concept(narrow)
 
-    # Connect to 3 targets with strengths 1.0, 0.8, 0.9 (avg = 0.9)
     for i, s in enumerate([1.0, 0.8, 0.9]):
-        tgt = ConceptBlueprint(id=f"app-{i}", title=f"App {i}", content="# App")
+        tgt = ConceptBlueprint(id=f"app-{i}", title=f"App {i}", content="# App", created_at=t0.isoformat())
         engine.add_concept(tgt)
-        engine.connect("svd", f"app-{i}", strength=s)
+        engine.connect("svd", f"app-{i}", strength=s, now=t0)
+    engine.connect("narrow", "app-0", strength=1.0, now=t0)
 
-    m_prereq = engine.calculate_concept_stability("svd")
-    assert m_prereq["breadth_k"] == 3
-    assert pytest.approx(m_prereq["avg_strength"], 0.01) == 0.9
-    expected_bonus = 1.0 + 0.5 * math.log(1.0 + 3)
-    expected_stability = 0.9 * expected_bonus
-    assert pytest.approx(m_prereq["stability"], 0.01) == expected_stability
+    m_broad = engine.calculate_concept_stability("svd", now=t0)
+    assert pytest.approx(m_broad["stability"], abs=1e-3) == 0.9 * breadth_multiplier(3)
+
+    t2 = _t(2)
+    eff_broad = engine.effective_connection_strength(engine.get_connection("svd", "app-0"), now=t2)
+    eff_narrow = engine.effective_connection_strength(engine.get_connection("narrow", "app-0"), now=t2)
+    assert eff_broad > eff_narrow
+    assert eff_narrow < 1.0
 
 
-def test_get_study_candidates_scans_upward_and_prioritizes_frayed():
+def test_spacing_effect_is_cram_proof_and_failure_contracts():
     engine = NexusEngine()
-    vae = ConceptBlueprint(
-        id="vae",
-        title="VAE",
-        content="# VAE\n\nVariational autoencoders.",
-    )
-    bayes = ConceptBlueprint(
-        id="bayes",
-        title="Bayes Theorem",
-        content="# Bayes\n\nBayesian inference.",
-    )
-    kl = ConceptBlueprint(
-        id="kl",
-        title="KL Divergence",
-        content="# KL\n\nInformation divergence.",
-    )
-    engine.add_concept(vae)
-    engine.add_concept(bayes)
-    engine.add_concept(kl)
+    t0 = _t(0)
+    engine.add_concept(ConceptBlueprint(id="u", title="U", content="# U", created_at=t0.isoformat()))
+    engine.add_concept(ConceptBlueprint(id="v", title="V", content="# V", created_at=t0.isoformat()))
+    engine.connect("u", "v", strength=1.0, now=t0)
 
-    # Wire upward: bayes -> vae, kl -> vae
-    engine.connect("bayes", "vae", strength=0.35)
-    engine.connect("kl", "vae", strength=0.98)
+    r_cram = engine.review_joint("u", "v", score=1.0, now=t0)
+    assert r_cram.new_half_life == 1.0
 
-    candidates = engine.get_study_candidates(top_k=2)
+    t_spaced = _t(1.5)
+    r_spaced = engine.review_joint("u", "v", score=1.0, now=t_spaced)
+    assert r_spaced.new_half_life > 1.8
 
-    assert len(candidates) >= 2
-    # The first candidate must be 'bayes' because its upward connection to vae is heavily frayed (0.35)
-    top = candidates[0]
-    assert top.concept.id == "bayes"
-    assert top.frayed_target is not None
-    assert top.frayed_target.id == "vae"
-    assert top.frayed_connection.strength == 0.35
+    r_fail = engine.review_joint("u", "v", score=0.0, now=t_spaced)
+    assert r_fail.new_half_life == pytest.approx(r_spaced.new_half_life * 0.5, abs=1e-3)
 
 
-def test_review_joint_and_bundle():
+def test_asymmetric_implicit_confirmation_on_diamond_dag():
     engine = NexusEngine()
-    c1 = ConceptBlueprint(id="c1", title="C1", content="# C1")
-    c2 = ConceptBlueprint(id="c2", title="C2", content="# C2")
-    engine.add_concept(c1)
-    engine.add_concept(c2)
+    t0 = _t(0)
+    for cid in ("bayes", "kl", "vae", "bnn"):
+        engine.add_concept(ConceptBlueprint(id=cid, title=cid.upper(), content=f"# {cid}", created_at=t0.isoformat()))
+
+    engine.connect("bayes", "vae", strength=0.60, now=t0)
+    engine.connect("kl", "vae", strength=0.70, now=t0)
+    engine.connect("vae", "bnn", strength=0.80, now=t0)
+    engine.connect("bayes", "bnn", strength=0.85, now=t0)
+
+    fail_res = engine.review_concept("bnn", score=0.20, now=t0)
+    assert fail_res.implicitly_reinforced == []
+    assert engine.get_connection("vae", "bnn").strength == 0.80
+    assert engine.get_connection("bayes", "vae").strength == 0.60
+
+    pass_res = engine.review_concept("bnn", score=1.0, now=t0)
+    by_edge = {(ir.source_id, ir.target_id): ir for ir in pass_res.implicitly_reinforced}
+
+    assert set(by_edge.keys()) == {
+        ("vae", "bnn"),
+        ("bayes", "bnn"),
+        ("bayes", "vae"),
+        ("kl", "vae"),
+    }
+    assert by_edge[("vae", "bnn")].depth == 1
+    assert by_edge[("vae", "bnn")].new_strength == pytest.approx(0.90, abs=1e-3)
+    assert by_edge[("bayes", "bnn")].depth == 1
+    assert by_edge[("bayes", "bnn")].new_strength == pytest.approx(0.925, abs=1e-3)
+    assert by_edge[("bayes", "vae")].depth == 2
+    assert by_edge[("bayes", "vae")].new_strength == pytest.approx(0.70, abs=1e-3)
+    assert by_edge[("kl", "vae")].depth == 2
+    assert by_edge[("kl", "vae")].new_strength == pytest.approx(0.775, abs=1e-3)
+
+
+def test_dual_urgency_edge_level_repair_and_top_down_leverage():
+    engine = NexusEngine()
+    t0 = _t(0)
+    for cid in ("bayes", "kl", "vae", "bnn"):
+        engine.add_concept(ConceptBlueprint(id=cid, title=cid.upper(), content=f"# {cid}", created_at=t0.isoformat()))
+
+    # Two frayed outgoing joints from the SAME concept ('bayes') must BOTH surface
+    engine.connect("bayes", "vae", strength=0.30, now=t0)
+    engine.connect("bayes", "bnn", strength=0.35, now=t0)
+    engine.connect("kl", "vae", strength=1.0, now=t0)
+    engine.connect("vae", "bnn", strength=1.0, now=t0)
+
+    cands_repair = engine.get_study_candidates(top_k=2, now=t0)
+    assert (cands_repair[0].concept.id, cands_repair[0].frayed_target.id) == ("bayes", "vae")
+    assert (cands_repair[1].concept.id, cands_repair[1].frayed_target.id) == ("bayes", "bnn")
+    assert cands_repair[0].review_reason == "repair"
+
+    # Once mastered (all 1.0), after 4 days of decay, the frontier leaf ('bnn') rises to #1
+    engine.connect("bayes", "vae", strength=1.0, now=t0)
+    engine.connect("bayes", "bnn", strength=1.0, now=t0)
+    t4 = _t(4)
+    cands_leverage = engine.get_study_candidates(top_k=1, now=t4)
+    top = cands_leverage[0]
+    assert top.concept.id == "bnn"
+    assert top.frayed_connection is None
+    assert top.review_reason == "leverage"
+    assert top.decay_leverage > top.fault_score
+    assert len(top.implicit_refresh_targets) == 4
+
+
+def test_topological_layers_diagnose_summary_and_search():
+    engine = NexusEngine()
+    t0 = _t(0)
+    engine.add_concept(ConceptBlueprint(id="bayes", title="Bayes' Theorem", topic="Probability", content="# Bayes", created_at=t0.isoformat()))
+    engine.add_concept(ConceptBlueprint(id="vae", title="VAEs", topic="Deep Learning", content="# ELBO", created_at=t0.isoformat()))
+    engine.add_concept(ConceptBlueprint(id="bnn", title="BNNs", topic="Machine Learning", content="# Weights", created_at=t0.isoformat()))
+    engine.add_concept(ConceptBlueprint(id="island", title="Orphan", topic="Misc", content="# Island", created_at=t0.isoformat()))
+
+    engine.connect("bayes", "vae", strength=0.35, now=t0)
+    engine.connect("vae", "bnn", strength=0.90, now=t0)
+    engine.connect("bayes", "bnn", strength=0.95, now=t0)
+
+    assert engine.topological_layers() == {"bayes": 0, "island": 0, "vae": 1, "bnn": 2}
+
+    diag = engine.diagnose_concept("bnn", now=t0)
+    assert diag["weakest_joint"]["source_id"] == "bayes"
+    assert diag["weakest_joint"]["target_id"] == "vae"
+    assert diag["weakest_joint"]["hops_below"] == 2
+    assert len(diag["supporting_cone"]) == 3
+
+    snap = engine.summary(now=t0)
+    assert snap["concept_count"] == 4
+    assert snap["connection_count"] == 3
+    assert snap["keystones"][0]["id"] == "bayes"
+    assert snap["active_faults"][0]["source_id"] == "bayes"
+    assert [i["id"] for i in snap["isolated_concepts"]] == ["island"]
+
+    assert [c.id for c in engine.search_concepts(query="elbo")] == ["vae"]
+    assert [c.id for c in engine.search_concepts(topic="prob")] == ["bayes"]
+
+
+def test_review_bundle():
+    engine = NexusEngine()
+    for cid in ("c1", "c2", "c3"):
+        engine.add_concept(ConceptBlueprint(id=cid, title=cid.upper(), content=f"# {cid}"))
     engine.connect("c1", "c2", strength=0.5)
-
-    # Review joint
-    updated_conn = engine.review_joint("c1", "c2", score=0.9)
-    assert updated_conn.strength == 0.9
-    assert updated_conn.review_count == 1
-    assert updated_conn.last_reviewed is not None
-
-    # Review bundle
-    c3 = ConceptBlueprint(id="c3", title="C3", content="# C3")
-    engine.add_concept(c3)
     engine.connect("c3", "c2", strength=0.4)
 
-    bundle_res = engine.review_bundle("c2", {"c1": 0.95, "c3": 0.85})
-    assert bundle_res["updated_joints"] == 2
-    assert engine.get_incoming("c2")[0].strength in [0.95, 0.85]
+    res = engine.review_bundle("c2", {"c1": 0.95, "c3": 0.30, "nonexistent": 0.5})
+    assert res["updated_joints"] == 2
+    assert res["skipped_sources"] == ["nonexistent"]
+    assert engine.get_connection("c1", "c2").strength == 0.95
+    assert engine.get_connection("c3", "c2").strength == 0.30

@@ -1,128 +1,104 @@
 # Nexus: Directed Cognitive Blueprint & Connection-Strength Knowledge Engine
 
-> **A graph-native cognitive architecture where concepts are standalone Markdown explainer documents, connections point UPWARD into higher applications, and review surfaces weak connections holding up complex reasoning structures.**
+> **A graph-native cognitive architecture where concepts are standalone Markdown explainer documents, connections point UPWARD into higher applications, memory decays continuously with structural anchoring, and mastery propagates asymmetrically downward.**
 
 ---
 
 ## 1. Motivation: Beyond Flat Flashcards
 
-Traditional spaced repetition systems (Anki, SM-2, FSRS) treat knowledge as disconnected, atomic flashcards evaluated by binary recall intervals. Even continuous manifold systems that assign scalar masses to points in an embedding space suffer from two fundamental flaws:
-1. **Isolated Evaluation**: Answering a question about Bayes' Theorem in isolation does not prove you understand how Bayes' Theorem operates inside the Evidence Lower Bound (ELBO) of a Variational Autoencoder.
-2. **Symmetric Blame**: If you fail to derive a complex framework (e.g. VAE), a flat system weakens the VAE node, yet cannot diagnose *which* underlying mathematical prerequisite broke down.
+Traditional spaced repetition systems (Anki, SM-2, FSRS) treat knowledge as disconnected, atomic flashcards:
+1. **Isolated Evaluation**: Recalling Bayes' Theorem in isolation does not prove you know how it operates inside a Variational Autoencoder's ELBO.
+2. **Symmetric Blame**: Failing a complex topic weakens the whole node without diagnosing *which* mathematical prerequisite broke.
+3. **Redundant Review**: Flat schedulers nag you to review basic foundations even when you actively exercise them inside advanced derivations.
 
-**Nexus replaces flat cards and scalar masses with a directed cognitive dependency graph:**
-- **Concepts as Standalone Markdown Documents**: A concept is not a tag, card, or brief summary. Each concept is a complete, studyable Markdown explainer document complete with mathematical derivations in LaTeX ($$...$$), structural invariants, and edge-case breakdowns that someone can read top-to-bottom to master the concept.
-- **Uniform Schema**: Every concept—whether a foundational building block like Bayes' Theorem or a complex framework like VAE—shares the exact same clean schema (`id`, `title`, `topic`, `content`).
-- **Directed Upward Connections**: Connections strictly point from foundational prerequisites into the higher-level applications that depend on them:
-  $$[\text{Prerequisite}] \xrightarrow{\quad\text{strength } w \in [0.0, 1.0]\quad} [\text{Higher Application}]$$
-- **Topology Alone Creates Hierarchy**: The connection strength $w$ defines the structural dependencies. The LLM understands how concepts relate directly from their Markdown content.
+**Nexus replaces flat cards with a directed acyclic cognitive dependency graph:**
+- **Concepts as Standalone Markdown Documents**: Every node—foundational or advanced—shares one uniform schema (`id`, `title`, `topic`, `content`) containing a complete studyable Markdown guide with LaTeX derivations, invariants, and edge cases.
+- **Directed Upward Connections**: Edges strictly point upward from prerequisites into higher applications:
+  $$[\text{Prerequisite}] \xrightarrow{\quad w \in [0.0, 1.0],\; h \text{ days}\quad} [\text{Higher Application}]$$
 
 ---
 
-## 2. Core Architecture
+## 2. Core Engine Rules (Minimal & Threshold-Free)
 
-### 2.1 Directed Upward Topology
-Every connection $e = (u, v)$ with weight $w \in [0, 1]$ represents the strength of prerequisite $u$ supporting target application $v$.
+Everything in Nexus flows from one shared concave curve, $B(n) = 1 + 0.5 \ln(1 + n)$, and four continuous rules:
 
-```
-[Variational Autoencoders] ◄───(w = 0.85)───┐
-      ▲                                      │
-      │ (w = 0.40, Weak!)                    │
-[Bayes' Theorem] ───────────────(w = 0.90)──► [Bayesian Neural Networks]
-```
+### 2.1 Breadth-Anchored Decay & Stability
+A concept applied across $K$ higher contexts is structurally anchored and decays more slowly:
+$$h_{\text{eff}}(u \to v) = h_{u \to v} \cdot B(K_u), \qquad R = 2^{-\Delta t / h_{\text{eff}}}, \qquad w_{\text{eff}} = w \cdot R$$
+Live concept stability combines average live outgoing quality with breadth:
+$$\text{Stability}(u) = \bar{w}_{\text{eff}} \cdot B(K_u)$$
+*(Frontier leaves with $K_u = 0$ fall back to their live intrinsic mastery.)*
 
-When reviewing Bayes' Theorem, Nexus looks **UPWARD** at its outgoing connections. If its joint into VAE is weak ($w = 0.40$) while its joint into BNN is sound ($w = 0.90$), the tutor targets the exact failure mode inside VAE.
+### 2.2 Cram-Proof Spacing Update
+On review with continuous score $s \in [0, 1]$, let $\delta = 2s - 1 \in [-1, 1]$:
+- **Passing ($\delta \ge 0$)**: $h' = h \cdot 2^{2\delta(1 - R)}$. Cramming immediately ($R \approx 1$) gives zero free inflation; spaced recall at half-life ($R = 0.5$) doubles $h$; delayed recall yields a desirable-difficulty boost.
+- **Struggling ($\delta < 0$)**: $h' = \max(0.25,\; h \cdot 2^{\delta})$, contracting half-life immediately.
 
-### 2.2 Stability Metric: Quality $\times$ Breadth
-A concept applied across many distinct domains is far more consolidated than a concept learned in a single chapter. To avoid high volume faking mastery, Nexus computes concept stability as the product of **average connection quality** and a concave **breadth multiplier**:
+### 2.3 Unified Dual Urgency (Repair + Leverage)
+Splitting the deficit $1 - w_{\text{eff}} = (1 - w) + w(1 - R)$ gives one threshold-free priority rule that is the exact mathematical dual of `review()`:
+$$\text{Urgency}(x) = \underbrace{(1 - w(x)) \cdot B(\text{load}(x))}_{\text{Surgical Repair (scales UPWARD)}} \;+\; \underbrace{\text{decay}(x) + \sum_{e \in \text{upstream}(x)} 0.5^d \cdot \text{decay}(e)}_{\text{Implicit Confirmation Leverage (sums DOWNWARD)}}$$
+- **Known broken foundations** trigger **bottom-up surgical repair**, weighted by the full downstream tower at risk.
+- **Mastered branches decaying over time** trigger **top-down high-leverage checks** at the frontier—pass once to refresh the entire prerequisite cone, or drop into fault isolation if you struggle.
 
-$$\text{Stability}(u) = \bar{w}_u \times \left(1.0 + 0.5 \ln(1 + K_u)\right)$$
-
-where:
-- $K_u = |\text{Out}(u)|$ is the number of higher applications relying on concept $u$.
-- $\bar{w}_u = \frac{1}{K_u} \sum_{e \in \text{Out}(u)} w_e$ is the average health of outgoing connections.
-- For frontier leaf concepts ($K_u = 0$, top of current horizon), stability falls back to the concept's intrinsic baseline score.
-
-| Outgoing Contexts ($K$) | Breadth Multiplier | Stability ($\bar{w} = 0.90$) | Stability ($\bar{w} = 0.50$) |
-|---|---|---|---|
-| $0$ (Frontier Leaf) | $1.00$ | $0.90$ (Intrinsic) | $0.50$ (Intrinsic) |
-| $1$ Context | $1.35$ | $1.21$ | $0.67$ |
-| $3$ Contexts | $1.69$ | $1.52$ | $0.85$ |
-| $7$ Contexts | $2.04$ | $1.84$ | $1.02$ |
-
-### 2.3 Asymmetric Socratic Diagnosis
-- **Mastering a high-level application** ($A \to B$ correct): Reinforces all inbound prerequisite joints feeding $B$.
-- **Struggling on a high-level application**: The LLM tutor inspects the inbound prerequisites, identifies the specific weak link via targeted dialogue, and weakens **only** that connection ($w \leftarrow \text{score}$), preserving undamaged prerequisites.
+### 2.4 Asymmetric Fault Isolation & Implicit Confirmation
+- **Mastery flows downward**: Scoring well on a higher joint or frontier leaf sends damped fractional confirmation ($0.5^d$) down to supporting prerequisites whenever $s > w_{\text{eff}}$.
+- **Failure stays isolated**: Struggling propagates *nothing* downward. Use `nexus diagnose` to isolate and weaken only the broken link(s).
 
 ---
 
 ## 3. Quickstart & CLI Reference
 
-### 3.1 Installation
+### Install
 ```bash
-cd nexus
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 ```
+*(After installing, run either `nexus ...` or `python -m nexus.cli ...`.)*
 
-### 3.2 Initialize Demo Network
-Pre-seeds a realistic deep learning network (VAEs, BNNs, Bayes' Theorem, KL Divergence, Latent Space Bottleneck) with full Markdown explainer documents and an intentional weak link:
+### Commands
 ```bash
-python -m nexus.cli init
-```
+# Seed realistic deep-learning demo graph with intact LaTeX Markdown explainers
+nexus init
 
-### 3.3 Study Selection (Scanning Upward)
-Surfaces the most urgent concepts whose upward joints are weak:
-```bash
-python -m nexus.cli study --top-k 1
-```
+# Bird's-eye network integrity, keystones, active faults, decay & isolated nodes
+nexus status
 
-### 3.4 Inspect a Concept Blueprint
-Displays the concept's Markdown explainer document, outgoing applications (looking UP), and foundational ingredients (looking DOWN):
-```bash
-python -m nexus.cli inspect bayes-theorem
-```
+# Surface highest-priority joint or frontier leaf (JSON with full docs, or --brief Markdown)
+nexus study --top-k 1
+nexus study --top-k 1 --brief
 
-### 3.5 Review & Repair a Joint
-Update the strength of a specific connection following Socratic dialogue:
-```bash
-python -m nexus.cli review --source bayes-theorem --target variational-autoencoders --score 0.95
-```
+# Top-down fault-isolation cone ranked by vulnerability
+nexus diagnose bayesian-neural-networks --brief
 
-### 3.6 Spontaneous Bundle Crystallization
-Record an "aha!" moment by adding a concept and its supporting prerequisites in one call. Both main concept and prerequisites share the identical Markdown document schema:
-```bash
-python -m nexus.cli add-bundle --data '{
-  "concept": {
-    "title": "Diffusion Probabilistic Models",
-    "topic": "Generative Models",
-    "content": "# Diffusion Probabilistic Models\n\n## 1. Forward Noising Process\nq(x_t | x_{t-1}) adds Gaussian perturbation over T steps...\n\n## 2. Reverse Denoising & Score Matching\nPredicted noise directly estimates score function nabla_{x_t} log p(x_t)..."
-  },
-  "prerequisites": [
-    {
-      "title": "Langevin Dynamics & Score Matching",
-      "topic": "Statistical Physics & ML",
-      "content": "# Langevin Dynamics\n\n## 1. Core Formulation\nSampling from unnormalized densities without the partition function Z...\n$$x_{k+1} = x_k + \\frac{\\epsilon}{2} \\nabla_x \\log p(x_k) + \\sqrt{\\epsilon} z$$"
-    }
-  ]
-}'
-```
+# Inspect a concept's document, layer, live strengths, downstream load & weakest bottleneck
+nexus inspect variational-autoencoders
 
-You can also add a concept directly from a local `.md` file:
-```bash
-python -m nexus.cli add-concept --title "Information Bottleneck" --topic "Information Theory" --file ./notes/bottleneck.md
-```
+# List / search existing concepts (ideal before crystallizing new bundles)
+nexus list
+nexus list --query "bayes"
 
-### 3.7 ASCII Graph Visualization
-```bash
-python -m nexus.cli graph
+# Review a directed joint, a frontier leaf, or isolate faults across a target's prerequisites
+nexus review --source bayes-theorem --target variational-autoencoders --score 0.95
+nexus review --concept bayesian-neural-networks --score 0.90
+nexus review --target variational-autoencoders --scores '{"bayes-theorem": 0.4, "kl-divergence": 0.95}'
+
+# Crystallize a new concept, reusing existing prerequisite IDs alongside new documents
+nexus add-bundle --file bundle.json        # or --file - to read from stdin
+
+# Wire or remove connections / concepts
+nexus connect --source kl-divergence --target bayesian-neural-networks --strength 0.9
+nexus remove --source kl-divergence --target bayesian-neural-networks
+
+# Export all concepts as linked standalone Markdown files + topological INDEX.md
+nexus export ./wiki
+
+# Topological ASCII overview (Foundations -> Frontier)
+nexus graph
 ```
 
 ---
 
 ## 4. Running Tests
 
-Run the full pytest suite:
 ```bash
-python -m pytest tests -v
+python -m pytest -v
 ```
-All 14 tests pass.
