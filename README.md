@@ -14,7 +14,10 @@ Traditional spaced repetition systems (Anki, SM-2, FSRS) treat knowledge as disc
 **Nexus replaces flat cards with a directed acyclic cognitive dependency graph:**
 - **Concepts as Standalone Markdown Documents**: Every node—foundational or advanced—shares one uniform schema (`id`, `title`, `topic`, `content`) containing a complete studyable Markdown guide with LaTeX derivations, invariants, and edge cases.
 - **Directed Upward Connections**: Edges strictly point upward from prerequisites into higher applications:
-  $$[\text{Prerequisite}] \xrightarrow{\quad w \in [0.0, 1.0],\; h \text{ days}\quad} [\text{Higher Application}]$$
+
+  $$
+  [\text{Prerequisite}] \xrightarrow{\quad w \in [0.0, 1.0],\, h \text{ days}\quad} [\text{Higher Application}]
+  $$
 
 ---
 
@@ -24,19 +27,31 @@ Everything in Nexus flows from one shared concave curve, $B(n) = 1 + 0.5 \ln(1 +
 
 ### 2.1 Breadth-Anchored Decay & Stability
 A concept applied across $K$ higher contexts is structurally anchored and decays more slowly:
-$$h_{\text{eff}}(u \to v) = h_{u \to v} \cdot B(K_u), \qquad R = 2^{-\Delta t / h_{\text{eff}}}, \qquad w_{\text{eff}} = w \cdot R$$
+
+$$
+h_{\text{eff}}(u \to v) = h_{u \to v} \cdot B(K_u), \qquad R = 2^{-\Delta t / h_{\text{eff}}}, \qquad w_{\text{eff}} = w \cdot R
+$$
+
 Live concept stability combines average live outgoing quality with breadth:
-$$\text{Stability}(u) = \bar{w}_{\text{eff}} \cdot B(K_u)$$
+
+$$
+\text{Stability}(u) = \bar{w}_{\text{eff}} \cdot B(K_u)
+$$
+
 *(Frontier leaves with $K_u = 0$ fall back to their live intrinsic mastery.)*
 
 ### 2.2 Cram-Proof Spacing Update
 On review with continuous score $s \in [0, 1]$, let $\delta = 2s - 1 \in [-1, 1]$:
 - **Passing ($\delta \ge 0$)**: $h' = h \cdot 2^{2\delta(1 - R)}$. Cramming immediately ($R \approx 1$) gives zero free inflation; spaced recall at half-life ($R = 0.5$) doubles $h$; delayed recall yields a desirable-difficulty boost.
-- **Struggling ($\delta < 0$)**: $h' = \max(0.25,\; h \cdot 2^{\delta})$, contracting half-life immediately.
+- **Struggling ($\delta < 0$)**: $h' = \max(0.25, h \cdot 2^{\delta})$, contracting half-life immediately.
 
 ### 2.3 Unified Dual Urgency (Repair + Leverage)
 Splitting the deficit $1 - w_{\text{eff}} = (1 - w) + w(1 - R)$ gives one threshold-free priority rule that is the exact mathematical dual of `review()`:
-$$\text{Urgency}(x) = \underbrace{(1 - w(x)) \cdot B(\text{load}(x))}_{\text{Surgical Repair (scales UPWARD)}} \;+\; \underbrace{\text{decay}(x) + \sum_{e \in \text{upstream}(x)} 0.5^d \cdot \text{decay}(e)}_{\text{Implicit Confirmation Leverage (sums DOWNWARD)}}$$
+
+$$
+\text{Urgency}(x) = \underbrace{(1 - w(x)) \cdot B(\text{load}(x))}_{\text{Surgical Repair (scales UPWARD)}} + \underbrace{\text{decay}(x) + \sum_{e \in \text{upstream}(x)} 0.5^d \cdot \text{decay}(e)}_{\text{Implicit Confirmation Leverage (sums DOWNWARD)}}
+$$
+
 - **Known broken foundations** trigger **bottom-up surgical repair**, weighted by the full downstream tower at risk.
 - **Mastered branches decaying over time** trigger **top-down high-leverage checks** at the frontier—pass once to refresh the entire prerequisite cone, or drop into fault isolation if you struggle.
 

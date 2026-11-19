@@ -41,22 +41,45 @@ def cmd_init(args) -> None:
 In generative modeling, we seek to model an unknown continuous data distribution $p(x)$ over high-dimensional observations $x \in \mathbb{R}^D$. Standard autoencoders compress inputs into deterministic coordinate vectors $z = f_\theta(x)$ inside a low-dimensional latent space $\mathbb{R}^d$. This deterministic mapping creates an uncontrolled latent topology with vast unmapped gaps: sampling an arbitrary latent vector $z \sim \mathcal{N}(0, I)$ and decoding it produces nonsensical outputs because the decoder was never trained on those empty regions.
 
 VAEs solve this by framing generation probabilistically: we introduce continuous latent variables $z$ governed by a prior distribution $p(z) = \mathcal{N}(0, I)$. The marginal data likelihood is:
-$$p(x) = \int p(x, z)\,dz = \int p_\theta(x|z)\,p(z)\,dz$$
+
+$$
+p(x) = \int p(x, z)\,dz = \int p_\theta(x|z)\,p(z)\,dz
+$$
+
 Direct optimization via Maximum Likelihood Estimation is computationally intractable because the integral requires evaluating all possible latent configurations across high-dimensional space. Furthermore, the true posterior:
-$$p(z|x) = \frac{p_\theta(x|z)\,p(z)}{p(x)}$$
+
+$$
+p(z|x) = \frac{p_\theta(x|z)\,p(z)}{p(x)}
+$$
+
 cannot be computed analytically due to the intractable denominator $p(x)$.
 
 ## 2. Variational Inference & The Evidence Lower Bound (ELBO)
 To circumvent the intractable true posterior, VAEs introduce an inference network (encoder) $q_\phi(z|x)$ that outputs parameters of a tractable Gaussian distribution:
-$$q_\phi(z|x) = \mathcal{N}(z; \mu_\phi(x), \Sigma_\phi(x))$$
+
+$$
+q_\phi(z|x) = \mathcal{N}(z; \mu_\phi(x), \Sigma_\phi(x))
+$$
+
 where $\Sigma_\phi(x) = \operatorname{diag}(\sigma_\phi^2(x))$.
 
 We measure the discrepancy between the approximation $q_\phi(z|x)$ and the true posterior $p(z|x)$ using Kullback-Leibler (KL) divergence:
-$$D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z|x)) = \mathbb{E}_{q_\phi(z|x)}\left[\log \frac{q_\phi(z|x)}{p(z|x)}\right]$$
+
+$$
+D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z|x)) = \mathbb{E}_{q_\phi(z|x)}\left[\log \frac{q_\phi(z|x)}{p(z|x)}\right]
+$$
+
 Expanding this divergence via Bayes' theorem yields:
-$$\log p(x) = \mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] - D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z)) + D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z|x))$$
+
+$$
+\log p(x) = \mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] - D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z)) + D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z|x))
+$$
+
 Because KL divergence is strictly non-negative ($D_{\mathrm{KL}} \ge 0$), we obtain the Evidence Lower Bound:
-$$\mathcal{L}_{\mathrm{ELBO}}(\theta, \phi; x) = \mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] - D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z)) \le \log p(x)$$
+
+$$
+\mathcal{L}_{\mathrm{ELBO}}(\theta, \phi; x) = \mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)] - D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z)) \le \log p(x)
+$$
 
 The objective decomposes into two opposing forces:
 1. **Reconstruction Log-Likelihood**: $\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)]$ penalizes reconstruction errors, driving the latent space to retain discriminative features.
@@ -64,13 +87,23 @@ The objective decomposes into two opposing forces:
 
 ## 3. The Reparameterization Trick
 Backpropagating gradients through the stochastic sampling step $z \sim q_\phi(z|x)$ is impossible with standard automatic differentiation because the node is stochastic. VAEs resolve this by isolating randomness into an independent auxiliary noise variable:
-$$\epsilon \sim \mathcal{N}(0, I)$$
-$$z = \mu_\phi(x) + \sigma_\phi(x) \odot \epsilon$$
+
+$$
+\epsilon \sim \mathcal{N}(0, I)
+$$
+
+$$
+z = \mu_\phi(x) + \sigma_\phi(x) \odot \epsilon
+$$
+
 Because the transformation is deterministic and differentiable with respect to $\mu_\phi$ and $\sigma_\phi$, analytical gradients $\nabla_\phi \mathcal{L}_{\mathrm{ELBO}}$ flow end-to-end through the encoder network.
 
 ## 4. Analytical KL Divergence for Gaussians
 When both the variational posterior $q_\phi(z|x) = \mathcal{N}(\mu, \operatorname{diag}(\sigma^2))$ and the prior $p(z) = \mathcal{N}(0, I)$ are Gaussian, the KL divergence resolves to closed form:
-$$D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z)) = -\frac{1}{2} \sum_{j=1}^d \left(1 + \log(\sigma_j^2) - \mu_j^2 - \sigma_j^2\right)$$
+
+$$
+D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z)) = -\frac{1}{2} \sum_{j=1}^d \left(1 + \log(\sigma_j^2) - \mu_j^2 - \sigma_j^2\right)
+$$
 
 ## 5. Failure Modes & Nuances
 - **Posterior Collapse**: When the decoder network $p_\theta(x|z)$ is excessively expressive (e.g., deep autoregressive models), it can model $p(x)$ directly, ignoring $z$. The KL term then drives $q_\phi(z|x) \to p(z)$ completely ($\mu \to 0, \sigma \to 1$), rendering the latent coordinates useless.
@@ -87,24 +120,40 @@ $$D_{\mathrm{KL}}(q_\phi(z|x) \parallel p(z)) = -\frac{1}{2} \sum_{j=1}^d \left(
 
 ## 1. Core Principle & Mathematical Statement
 Bayes' Theorem is the fundamental law of belief updating under observed evidence. For an unobserved parameter or latent state $z$ and an observed dataset $x$:
-$$P(z|x) = \frac{P(x|z)\,P(z)}{P(x)}$$
+
+$$
+P(z|x) = \frac{P(x|z)\,P(z)}{P(x)}
+$$
 
 The components represent distinct probabilistic entities:
 - **Prior $P(z)$**: The initial probability distribution over hypotheses before observing evidence.
 - **Likelihood $P(x|z)$**: The probability of the observed data conditioned on a specific hypothesis $z$.
 - **Evidence / Marginal Likelihood $P(x)$**: The total probability of the data averaged over all possible hypotheses:
-  $$P(x) = \int P(x|z)\,P(z)\,dz$$
+  
+
+$$
+P(x) = \int P(x|z)\,P(z)\,dz
+$$
+
 - **Posterior $P(z|x)$**: The updated distribution over hypotheses after incorporating the data $x$.
 
 ## 2. The Intractability of the Denominator
 In low-dimensional discrete settings, computing $P(x) = \sum_i P(x|z_i)\,P(z_i)$ is trivial. However, when $z \in \mathbb{R}^d$ is high-dimensional (e.g., latent vectors in deep learning, weight spaces in neural networks), the integral:
-$$P(x) = \int_{\mathbb{R}^d} P(x|z)\,P(z)\,dz$$
+
+$$
+P(x) = \int_{\mathbb{R}^d} P(x|z)\,P(z)\,dz
+$$
+
 has no closed-form solution for complex non-linear models. This intractability directly necessitates approximate inference methods such as Markov Chain Monte Carlo (MCMC) and Variational Inference.
 
 ## 3. Base Rate Fallacy & Concrete Numerical Behavior
 When the prior probability $P(z)$ of an event is extremely low, even a highly accurate diagnostic test yields a low posterior probability upon a positive test result.
 If a disease has prevalence $P(D) = 0.001$, and a test has $99\%$ sensitivity ($P(+|D) = 0.99$) and $95\%$ specificity ($P(-|\neg D) = 0.95$):
-$$P(D|+) = \frac{P(+|D)\,P(D)}{P(+|D)\,P(D) + P(+|\neg D)\,P(\neg D)} = \frac{0.99 \times 0.001}{(0.99 \times 0.001) + (0.05 \times 0.999)} \approx 0.0194$$
+
+$$
+P(D|+) = \frac{P(+|D)\,P(D)}{P(+|D)\,P(D) + P(+|\neg D)\,P(\neg D)} = \frac{0.99 \times 0.001}{(0.99 \times 0.001) + (0.05 \times 0.999)} \approx 0.0194
+$$
+
 Even after testing positive, the posterior probability is less than $2\%$, because the false-positive volume from the large healthy population overwhelms the true positives.
 """,
         intrinsic_score=1.0,
@@ -119,13 +168,21 @@ Even after testing positive, the posterior probability is less than $2\%$, becau
 ## 1. Definition & Information-Theoretic Foundations
 Kullback-Leibler divergence (relative entropy) measures the statistical discrepancy and coding inefficiency when a true probability distribution $P$ is approximated by distribution $Q$.
 For continuous random variables with densities $p(x)$ and $q(x)$:
-$$D_{\mathrm{KL}}(P \parallel Q) = \int_{\mathcal{X}} p(x) \log \frac{p(x)}{q(x)}\,dx = \mathbb{E}_{x \sim P}\left[\log p(x) - \log q(x)\right]$$
+
+$$
+D_{\mathrm{KL}}(P \parallel Q) = \int_{\mathcal{X}} p(x) \log \frac{p(x)}{q(x)}\,dx = \mathbb{E}_{x \sim P}\left[\log p(x) - \log q(x)\right]
+$$
 
 In coding theory, if events occur according to $P$, the optimal code length for $x$ is $-\log_2 p(x)$ bits. Constructing a code assuming $Q$ yields expected excess code length per symbol of exactly $D_{\mathrm{KL}}(P \parallel Q)$.
 
 ## 2. Invariants & Asymmetry
 1. **Non-negativity ($D_{\mathrm{KL}} \ge 0$)**: Proven via Jensen's inequality applied to the convex function $f(t) = t \log t$:
-   $$D_{\mathrm{KL}}(P \parallel Q) = \mathbb{E}_{Q}\left[\frac{p(x)}{q(x)} \log \frac{p(x)}{q(x)}\right] \ge f\left(\mathbb{E}_Q\left[\frac{p(x)}{q(x)}\right]\right) = f(1) = 0$$
+   
+
+$$
+D_{\mathrm{KL}}(P \parallel Q) = \mathbb{E}_{Q}\left[\frac{p(x)}{q(x)} \log \frac{p(x)}{q(x)}\right] \ge f\left(\mathbb{E}_Q\left[\frac{p(x)}{q(x)}\right]\right) = f(1) = 0
+$$
+
    Equality holds if and only if $P = Q$ almost everywhere.
 2. **Asymmetry ($D_{\mathrm{KL}}(P \parallel Q) \ne D_{\mathrm{KL}}(Q \parallel P)$)**: KL divergence is not a mathematical metric because it violates symmetry and the triangle inequality.
 
@@ -145,7 +202,11 @@ In coding theory, if events occur according to $P$, the optimal code length for 
 ## 1. Information Bottleneck Principle
 A latent space bottleneck is an intentional dimensional constriction in a neural architecture that prevents trivial identity mappings and forces representation abstraction.
 Given input $X$ and target $Y$, the Information Bottleneck objective maximizes mutual information with the target while minimizing mutual information with the input:
-$$\max_{\theta}\; I(Z; Y) - \beta\,I(Z; X)$$
+
+$$
+\max_{\theta}  I(Z; Y) - \beta\,I(Z; X)
+$$
+
 where $Z = f_\theta(X)$ is the bottleneck representation.
 
 ## 2. Dimensionality vs Manifold Discovery
@@ -168,18 +229,32 @@ Constricting the bottleneck dimension to $d$:
 
 ## 1. Deterministic vs Probabilistic Weight Spaces
 Standard neural networks optimize point estimates of parameter matrices:
-$$\mathbf{w}^* = \arg\min_{\mathbf{w}} \sum_{i} \mathcal{L}(f(x_i; \mathbf{w}), y_i)$$
+
+$$
+\mathbf{w}^* = \arg\min_{\mathbf{w}} \sum_{i} \mathcal{L}(f(x_i; \mathbf{w}), y_i)
+$$
+
 This yields overconfident predictions on out-of-distribution inputs because a single parameter vector produces confident outputs even far from training support.
 
 BNNs place a prior distribution over weights $p(\mathbf{w}) = \mathcal{N}(0, \sigma_0^2 I)$. Given dataset $\mathcal{D} = \{(x_i, y_i)\}$, learning computes the weight posterior via Bayes' rule:
-$$p(\mathbf{w}|\mathcal{D}) = \frac{p(\mathcal{D}|\mathbf{w})\,p(\mathbf{w})}{\int p(\mathcal{D}|\mathbf{w})\,p(\mathbf{w})\,d\mathbf{w}}$$
+
+$$
+p(\mathbf{w}|\mathcal{D}) = \frac{p(\mathcal{D}|\mathbf{w})\,p(\mathbf{w})}{\int p(\mathcal{D}|\mathbf{w})\,p(\mathbf{w})\,d\mathbf{w}}
+$$
 
 ## 2. Bayes by Backprop (Variational BNNs)
 Because integrating over millions of weights is intractable, we fit a variational distribution $q_\theta(\mathbf{w})$ parameterized by mean $\mu$ and unconstrained scale $\rho$ (where $\sigma = \operatorname{softplus}(\rho)$).
 Using the reparameterization trick:
-$$\mathbf{w} = \mu + \sigma \odot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)$$
+
+$$
+\mathbf{w} = \mu + \sigma \odot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)
+$$
+
 The network minimizes the variational free energy (negative ELBO):
-$$\mathcal{F}(\theta, \mathcal{D}) = D_{\mathrm{KL}}(q_\theta(\mathbf{w}) \parallel p(\mathbf{w})) - \mathbb{E}_{q_\theta(\mathbf{w})}[\log p(\mathcal{D}|\mathbf{w})]$$
+
+$$
+\mathcal{F}(\theta, \mathcal{D}) = D_{\mathrm{KL}}(q_\theta(\mathbf{w}) \parallel p(\mathbf{w})) - \mathbb{E}_{q_\theta(\mathbf{w})}[\log p(\mathcal{D}|\mathbf{w})]
+$$
 
 ## 3. Epistemic vs Aleatoric Uncertainty
 - **Aleatoric Uncertainty**: Inherent observational noise in the data-generating process (captured by output distribution variance $\sigma_y^2(x)$).
